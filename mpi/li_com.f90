@@ -1,13 +1,14 @@
 module li_com
 
   implicit none
+  include 'mpif.h'
 
 ! li.in primary input variables
   integer :: nx,ny,nt
   real(8) :: tol,lx,ly,dt,theta,amp
-  integer :: ni,initphi,ninit
+  integer :: tni,initphi,ninit
   real(8) :: kapn,kapt,tets,memi
-  integer :: bounded,enlin,wnlin,openmp,isolate,zflow
+  integer :: bounded,enlin,wnlin,isolate,zflow
   real(8) :: xshape,yshape
   integer :: nrec,nprint,nmode
   integer,dimension(:,:),allocatable :: modeindices
@@ -21,10 +22,10 @@ module li_com
   integer :: iseed
   real(8) :: pi,pi2
   real(8) :: res
+  integer :: ni,myid,nproc,ierr !MPI
 
 ! timing variables
-  integer :: wall_start,wall_finish
-  real(8) :: wall_total
+  real(8) :: wall_start,wall_finish,wall_total
 
 ! fft variables
   complex(8),dimension(:),allocatable :: tmpx
