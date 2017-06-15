@@ -10,6 +10,10 @@ program li
   implicit none
   integer :: doprint
 
+  call mpi_init(ierr)
+  call mpi_comm_size(mpi_comm_world,nproc,ierr)
+  call mpi_comm_rank(mpi_comm_world,myid,ierr)
+
   !set start time in sec
   wall_start = mpi_wtime()
 
@@ -24,7 +28,7 @@ program li
   do timestep=1,nt
 
     doprint=0
-    if (mod(timestep,nprint).eq.0) doprint=1
+    if (myid==0.and.mod(timestep,nprint).eq.0) doprint=1
     if (doprint.eq.1) print *
     if (doprint.eq.1) print *, 'timestep', timestep
 
@@ -59,15 +63,16 @@ program li
   end do
 
   call finalize_com
-  call mpi_finalize(ierr)
 
   !set end time in sec
   wall_finish = mpi_wtime()
 
+  call mpi_finalize(ierr)
+
   !time elapsed in sec
   wall_total=wall_finish-wall_start
   print *
-  print *, 'Wall Clock Seconds Elapsed = ',wall_total
+  if (myid==0) print *, 'Wall Clock Seconds Elapsed = ',wall_total
 
 !-----------------------------------------------------------------------
 
@@ -83,10 +88,6 @@ subroutine initialize
   character*(72) dumchar
   integer :: idum,i,j,ki,kj
   real(8) :: kx,ky,kp2,filt
-
-  call mpi_init(ierr)
-  call mpi_comm_size(mpi_comm_world,nproc,ierr)
-  call mpi_comm_rank(mpi_comm_world,myid,ierr)
 
   do i=0,nproc-1
     if (myid==i) then
@@ -551,7 +552,7 @@ subroutine modeout(hist,fl,id)
   character*70 :: flnm
   complex(8) :: hist(1:nmode)
 
-  if (myid==0)
+  if (myid==0) then
     flnm=fl//'.out'
     open(id,file=flnm,form='formatted',status='unknown',&
       position='append')
@@ -579,7 +580,7 @@ subroutine gridout(u,fl,id)
   character*5 :: fl
   character*70 :: flnm
 
-  if (myid==0)
+  if (myid==0) then
     flnm=fl//'.out'
     open(id,file=flnm,form='formatted',status='unknown',&
       position='append')
@@ -600,7 +601,7 @@ subroutine diagnostics
 
   implicit none
   integer :: id,m,i,j
-  real(8) ::xpdx,ypdy,wx,wy,myqx,myw2sum
+  real(8) ::xpdx,ypdy,wx,wy,qx,myqx,w2sum,myw2sum
   character*5 :: fl
   character*70 :: flnm
 
@@ -623,7 +624,7 @@ subroutine diagnostics
   qx=qx/dble(tni)
   w2sum=w2sum/dble(tni)
 
-  if (myid==0)
+  if (myid==0) then
     flnm='diagn.out'
     open(id,file=flnm,form='formatted',status='unknown',&
       position='append')
@@ -653,8 +654,6 @@ subroutine zdiagnostics
   mypx=0
   py=0
   mypy=0
-  dp=0
-  er=0
 
   do m=1,ni
     xpdx=x1(m)/dx
@@ -701,7 +700,7 @@ subroutine zdiagnostics
   pxflnm='px.out'
   pyflnm='py.out'
 
-  if (myid==0)
+  if (myid==0) then
     open(uyid,file=uyflnm,form='formatted',status='unknown',&
       position='append')
     write(uyid,'(f8.2)',advance='no') dt*timestep
