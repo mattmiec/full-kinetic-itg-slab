@@ -110,7 +110,8 @@ subroutine initialize
       read(115,*) isolate,zflow,xshape,yshape
       read(115,*) dumchar
       read(115,*) nrec,nprint,nmode
-      ni=tni/nproc !particle per proc
+      ni=tni/nproc !particles per proc
+      tni=ni*nproc !actual total particle number
       call init_com
       read(115,*) dumchar
       read(115,*) modeindices

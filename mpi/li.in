@@ -6,10 +6,10 @@
    64          64          10000       1d-6 
                                                                       
 '  lx          ly          dt          theta                           '
-   157.08      15.71       0.1         0.01
+   62.83       15.71       0.1         0.01
                                                                  
 '  ni          amp         initphi     ninit                           '
-   4194304     1d-3        0           50
+   67108864     1d-3        0           50
                                                                       
 '  kappan      kappat      tets        memi                            '
    0.0         0.05        1.0         0.01
