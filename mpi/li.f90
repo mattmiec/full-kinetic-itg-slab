@@ -71,8 +71,10 @@ program li
 
   !time elapsed in sec
   wall_total=wall_finish-wall_start
-  print *
-  if (myid==0) print *, 'Wall Clock Seconds Elapsed = ',wall_total
+  if (myid==0) then  
+    print *
+    print *, 'Wall Clock Seconds Elapsed = ',wall_total
+  endif
 
 !-----------------------------------------------------------------------
 
