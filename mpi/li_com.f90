@@ -33,12 +33,11 @@ module li_com
 
 ! particle array declarations
   real(8),dimension(:),allocatable :: x0,y0,vx0,vy0,vz0
-  real(8),dimension(:),allocatable :: x1,y1,vx1,vy1,vz1
   real(8),dimension(:),allocatable :: w0,w1
 
 ! grid array declarations
-  real(8),dimension(:,:),allocatable :: den0,den1,dent
-  real(8),dimension(:,:),allocatable :: phi0,phi1,coeff
+  real(8),dimension(:,:),allocatable :: den0,denlast
+  real(8),dimension(:,:),allocatable :: phi0,coeff
   real(8),dimension(:,:),allocatable :: ex0,ey0
   real(8),dimension(:,:),allocatable :: ex1,ey1
   real(8),dimension(:,:),allocatable :: tempxy

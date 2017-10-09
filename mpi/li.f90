@@ -44,7 +44,7 @@ program li
       if (doprint.eq.1) print *,'residual =',res
     end do
 
-    call update_wrapper
+    w0=w1
 
     call temperature
 
@@ -160,41 +160,20 @@ end
 
 !-----------------------------------------------------------------------
 
-subroutine update_wrapper
-
-  implicit none
-
-  x0=x1
-  y0=y1
-  vx0=vx1
-  vy0=vy1
-  vz0=vz1
-  w0=w1
-
-  den0=den1
-  phi0=phi1
-
-  ex0=ex1
-  ey0=ey1
-
-end
-
-!-----------------------------------------------------------------------
-
 subroutine load
 
   integer :: m
 
   do m=1,ni
 !   load particle positions
-    x1(m)=lx*revers(myid*ni+m,2)
-    y1(m)=ly*(dble(myid*ni+m)-0.5)/dble(tni)
+    x0(m)=lx*revers(myid*ni+m,2)
+    y0(m)=ly*(dble(myid*ni+m)-0.5)/dble(tni)
 !   load maxwellian velocities
-    vx1(m)=dinvnorm(revers(myid*ni+m,3))
-    vy1(m)=dinvnorm(revers(myid*ni+m,5))
-    vz1(m)=dinvnorm(revers(myid*ni+m,7))
+    vx0(m)=dinvnorm(revers(myid*ni+m,3))
+    vy0(m)=dinvnorm(revers(myid*ni+m,5))
+    vz0(m)=dinvnorm(revers(myid*ni+m,7))
 !   initialize weights
-    w1(m)=amp*dsin(pi2*x1(m)/lx)*dsin(pi2*y1(m)/ly)
+    w0(m)=amp*dsin(pi2*x0(m)/lx)*dsin(pi2*y0(m)/ly)
   end do
 
 end
@@ -210,13 +189,13 @@ subroutine accumulate
   real(8) :: myden(0:nx,0:ny)
   integer :: i,j,m
 
-  dent=den1
-  den1=0
+  denlast=den0
+  den0=0
   myden=0
 
   do m=1,ni
-    xpdx=x1(m)/dx
-    ypdy=y1(m)/dy
+    xpdx=x0(m)/dx
+    ypdy=y0(m)/dy
     i=int(xpdx)
     j=int(ypdy)
     wx=dble(i+1)-xpdx
@@ -227,25 +206,25 @@ subroutine accumulate
     myden(i+1,j+1)=myden(i+1,j+1)+w1(m)*(1.0-wx)*(1.0-wy)
   end do
 
-  call mpi_allreduce(myden,den1,(nx+1)*(ny+1),mpi_real8,mpi_sum,mpi_comm_world,ierr)
+  call mpi_allreduce(myden,den0,(nx+1)*(ny+1),mpi_real8,mpi_sum,mpi_comm_world,ierr)
 
   !divide by particles per cell
-  den1=den1*dble(nx)*dble(ny)/dble(tni)
+  den0=den0*dble(nx)*dble(ny)/dble(tni)
 
   do i=0,nx
-    den1(i,0)=den1(i,0)+den1(i,ny)
-    den1(i,ny)=den1(i,0)
+    den0(i,0)=den0(i,0)+den0(i,ny)
+    den0(i,ny)=den0(i,0)
   end do
 
   do j=0,ny
-    den1(0,j)=den1(0,j)+den1(nx,j)
-    den1(nx,j)=den1(0,j)
+    den0(0,j)=den0(0,j)+den0(nx,j)
+    den0(nx,j)=den0(0,j)
   end do
 
   if ((timestep.le.ninit).and.(initphi.eq.1)) then
     do i=0,nx
       do j=0,ny
-        den1(i,j)=amp*dsin(pi*i/nx)*dsin(pi2*j/ny)
+        den0(i,j)=amp*dsin(pi*i/nx)*dsin(pi2*j/ny)
       end do
     end do
   end if
@@ -265,7 +244,7 @@ subroutine field
   complex(8) :: ex(0:nx-1,0:ny-1),ey(0:nx-1,0:ny-1)
 
   !set potential equal to density and transform to k-space
-  phi = den1(0:nx-1,0:ny-1)
+  phi = den0(0:nx-1,0:ny-1)
 
   do j=0,ny-1
     call ccfft('x',-1,nx,phi(:,j))
@@ -345,17 +324,17 @@ subroutine field
   end do
 
   !store final phi,e-field
-  phi1(0:nx-1,0:ny-1)=real(phi)
-  ex1(0:nx-1,0:ny-1)=real(ex)
-  ey1(0:nx-1,0:ny-1)=real(ey)
+  phi0(0:nx-1,0:ny-1)=real(phi)
+  ex0(0:nx-1,0:ny-1)=real(ex)
+  ey0(0:nx-1,0:ny-1)=real(ey)
 
   !periodic boundaries
-  phi1(:,ny)=phi1(:,0)
-  phi1(nx,:)=phi1(0,:)
-  ex1(:,ny)=ex1(:,0)
-  ex1(nx,:)=ex1(0,:)
-  ey1(:,ny)=ey1(:,0)
-  ey1(nx,:)=ey1(0,:)
+  phi0(:,ny)=phi0(:,0)
+  phi0(nx,:)=phi0(0,:)
+  ex0(:,ny)=ex0(:,0)
+  ex0(nx,:)=ex0(0,:)
+  ey0(:,ny)=ey0(:,0)
+  ey0(nx,:)=ey0(0,:)
 
   return
 
@@ -374,8 +353,8 @@ subroutine residual
 
   do i=0,nx
     do j=0,ny
-      res = res + (den1(i,j)-dent(i,j))**2
-      norm = norm + den1(i,j)**2
+      res = res + (den0(i,j)-denlast(i,j))**2
+      norm = norm + den0(i,j)**2
     end do
   end do
   res = (res/norm)**.5
@@ -488,16 +467,16 @@ subroutine temperature
   tempxy=0
 
   do m=1,ni
-    xpdx=x1(m)/dx
-    ypdy=y1(m)/dy
+    xpdx=x0(m)/dx
+    ypdy=y0(m)/dy
     i=int(xpdx)
     j=int(ypdy)
     wx=dble(i+1)-xpdx
     wy=dble(j+1)-ypdy
-    mytempxy(i,j)=mytempxy(i,j)+w1(m)*wx*wy*(vx1(m)**2+(cth*vy1(m)-sth*vz1(m))**2)
-    mytempxy(i+1,j)=mytempxy(i+1,j)+w1(m)*(1.0-wx)*wy*(vx1(m)**2+(cth*vy1(m)-sth*vz1(m))**2)
-    mytempxy(i,j+1)=mytempxy(i,j+1)+w1(m)*wx*(1.0-wy)*(vx1(m)**2+(cth*vy1(m)-sth*vz1(m))**2)
-    mytempxy(i+1,j+1)=mytempxy(i+1,j+1)+w1(m)*(1.0-wx)*(1.0-wy)*(vx1(m)**2+(cth*vy1(m)-sth*vz1(m))**2)
+    mytempxy(i,j)=mytempxy(i,j)+w1(m)*wx*wy*(vx0(m)**2+(cth*vy0(m)-sth*vz0(m))**2)
+    mytempxy(i+1,j)=mytempxy(i+1,j)+w1(m)*(1.0-wx)*wy*(vx0(m)**2+(cth*vy0(m)-sth*vz0(m))**2)
+    mytempxy(i,j+1)=mytempxy(i,j+1)+w1(m)*wx*(1.0-wy)*(vx0(m)**2+(cth*vy0(m)-sth*vz0(m))**2)
+    mytempxy(i+1,j+1)=mytempxy(i+1,j+1)+w1(m)*(1.0-wx)*(1.0-wy)*(vx0(m)**2+(cth*vy0(m)-sth*vz0(m))**2)
   end do
  
   call mpi_allreduce(mytempxy,tempxy,(nx+1)*(ny+1),mpi_real8,mpi_sum,mpi_comm_world,ierr)
@@ -611,7 +590,7 @@ subroutine diagnostics
   myw2sum=0
   do m=1,ni
     !net heat flux in x-direction
-    myqx = myqx + w1(m)*vx1(m)*(vx1(m)**2+vy1(m)**2+vz1(m)**2)
+    myqx = myqx + w1(m)*vx0(m)*(vx0(m)**2+vy0(m)**2+vz0(m)**2)
     !weight squared sum
     myw2sum = myw2sum + w1(m)**2
   end do
@@ -654,17 +633,17 @@ subroutine zdiagnostics
   mypy=0
 
   do m=1,ni
-    xpdx=x1(m)/dx
+    xpdx=x0(m)/dx
     i=int(xpdx)
     wx=dble(i+1)-xpdx
-    myuy(i)=myuy(i)+w1(m)*wx*vy1(m)
-    myuy(i+1)=myuy(i+1)+w1(m)*(1.0-wx)*vy1(m)
-    myuz(i)=myuz(i)+w1(m)*wx*vz1(m)
-    myuz(i+1)=myuz(i+1)+w1(m)*(1.0-wx)*vz1(m)
-    mypx(i)=mypx(i)+w1(m)*wx*vx1(m)**2
-    mypx(i+1)=mypx(i+1)+w1(m)*(1.0-wx)*vx1(m)**2
-    mypy(i)=mypy(i)+w1(m)*wx*(cth*vy1(m)-sth*vz1(m))**2
-    mypy(i+1)=mypy(i+1)+w1(m)*(1.0-wx)*(cth*vy1(m)-sth*vz1(m))**2
+    myuy(i)=myuy(i)+w1(m)*wx*vy0(m)
+    myuy(i+1)=myuy(i+1)+w1(m)*(1.0-wx)*vy0(m)
+    myuz(i)=myuz(i)+w1(m)*wx*vz0(m)
+    myuz(i+1)=myuz(i+1)+w1(m)*(1.0-wx)*vz0(m)
+    mypx(i)=mypx(i)+w1(m)*wx*vx0(m)**2
+    mypx(i+1)=mypx(i+1)+w1(m)*(1.0-wx)*vx0(m)**2
+    mypy(i)=mypy(i)+w1(m)*wx*(cth*vy0(m)-sth*vz0(m))**2
+    mypy(i+1)=mypy(i+1)+w1(m)*(1.0-wx)*(cth*vy0(m)-sth*vz0(m))**2
   enddo
 
   call mpi_allreduce(myuy,uy,nx+1,mpi_real8,mpi_sum,mpi_comm_world,ierr)
