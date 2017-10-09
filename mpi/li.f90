@@ -394,6 +394,7 @@ subroutine epush
   real(8) :: ax,ay
   real(8) :: wx,wy
   real(8) :: xpdx,ypdy
+  real(8) :: vxt,vyt !temp velocity storage
 
   do m=1,ni
     ! interpolation weights
@@ -403,33 +404,39 @@ subroutine epush
     j=int(ypdy)
     wx=dble(i+1)-xpdx
     wy=dble(j+1)-ypdy
-    ! acceleration
+    ! interpolate e-field
     ax=ex0(i,j)*wx*wy+ex0(i+1,j)*(1.0-wx)*wy+&
       ex0(i,j+1)*wx*(1.0-wy)+ex0(i+1,j+1)*(1.0-wx)*(1.0-wy)
     ay=ey0(i,j)*wx*wy+ey0(i+1,j)*(1.0-wx)*wy+&
       ey0(i,j+1)*wx*(1.0-wy)+ey0(i+1,j+1)*(1.0-wx)*(1.0-wy)
+    ! 1/2 velocity push
+    vx0(m)=vx0(m)+.5*dt*ax*enlin
+    vy0(m)=vy0(m)+.5*dt*ay*enlin
+    ! full velocity rotation (theta,dt,-theta)
+    vxt=cdt*vx0(m)+sdt*cth*vy0(m)-sdt*sth*vz0(m)
+    vyt=-1.0*sdt*cth*vx0(m)+(cdt*cth**2+sth**2)*vy0(m)&
+      +(-1.0*cdt*sth*cth+sth*cth)*vz0(m)
+    vz0(m)=sdt*sth*vx0(m)+(-1.0*cdt*sth*cth+sth*cth)*vy0(m)&
+      +(cdt*sth**2+cth**2)*vz0(m)
+    vx0(m)=vxt
+    vy0(m)=vyt
+    ! 1/2 velocity push
+    vx0(m)=vx0(m)+.5*dt*ax*enlin
+    vy0(m)=vy0(m)+.5*dt*ay*enlin
     ! weight equation terms
     vdv=vx0(m)**2+vy0(m)**2+vz0(m)**2
     edv=vx0(m)*ax+vy0(m)*ay
     kap=kapn+kapt*(.5*vdv-1.5)
-    ! explicit weight advance
+    ! explicit 1/2 weight advance
     w0(m)=w0(m)+.5*dt*(1-w0(m)*wnlin)*(edv+cth*ay*kap)
-    ! explicit position advance
-    x0(m)=x0(m)+.5*dt*vx0(m)
-    y0(m)=y0(m)+.5*dt*vy0(m)
-    ! explicit velocity advance e-field
-    vx0(m)=vx0(m)+.5*dt*ax*enlin
-    vy0(m)=vy0(m)+.5*dt*ay*enlin
-    ! full explicit velocity rotation
-    ! rotation by theta + dt + -theta
-    vx1(m)=cdt*vx0(m)+sdt*cth*vy0(m)-sdt*sth*vz0(m)
-    vy1(m)=-1.0*sdt*cth*vx0(m)+(cdt*cth**2+sth**2)*vy0(m)&
-      +(-1.0*cdt*sth*cth+sth*cth)*vz0(m)
-    vz1(m)=sdt*sth*vx0(m)+(-1.0*cdt*sth*cth+sth*cth)*vy0(m)&
-      +(cdt*sth**2+cth**2)*vz0(m)
-    vx0(m)=vx1(m)
-    vy0(m)=vy1(m)
+    ! full position advance
+    x0(m)=x0(m)+dt*vx0(m)
+    y0(m)=y0(m)+dt*vy0(m)
+    ! periodic boundaries
+    x0(m)=x0(m)-lx*dble(floor(x0(m)/lx))
+    y0(m)=y0(m)-ly*dble(floor(y0(m)/ly))
   end do
+
 
 end
 
@@ -445,32 +452,20 @@ subroutine ipush
   real(8) :: xpdx,ypdy
 
   do m=1,ni
-    ! implicit position advance
-    x1(m)=x0(m)+.5*dt*vx1(m)
-    y1(m)=y0(m)+.5*dt*vy1(m)
-    ! periodic boundaries
-    x0(m)=x0(m)-lx*dble(floor(x0(m)/lx))
-    y0(m)=y0(m)-ly*dble(floor(y0(m)/ly))
-    x1(m)=x1(m)-lx*dble(floor(x1(m)/lx))
-    y1(m)=y1(m)-ly*dble(floor(y1(m)/ly))
-    ! interpolation weights
-    xpdx=x1(m)/dx
-    ypdy=y1(m)/dy
+    xpdx=x0(m)/dx
+    ypdy=y0(m)/dy
     i=int(xpdx)
     j=int(ypdy)
     wx=dble(i+1)-xpdx
     wy=dble(j+1)-ypdy
-    ! acceleration
-    ax=ex1(i,j)*wx*wy+ex1(i+1,j)*(1.0-wx)*wy+&
-      ex1(i,j+1)*wx*(1.0-wy)+ex1(i+1,j+1)*(1.0-wx)*(1.0-wy)
-    ay=ey1(i,j)*wx*wy+ey1(i+1,j)*(1.0-wx)*wy+&
-      ey1(i,j+1)*wx*(1.0-wy)+ey1(i+1,j+1)*(1.0-wx)*(1.0-wy)
-    ! implicit velocity advance e-field
-    vx1(m)=vx0(m)+.5*dt*ax*enlin
-    vy1(m)=vy0(m)+.5*dt*ay*enlin
+    ! interpolate e-field
+    ax=ex0(i,j)*wx*wy+ex0(i+1,j)*(1.0-wx)*wy+&
+      ex0(i,j+1)*wx*(1.0-wy)+ex0(i+1,j+1)*(1.0-wx)*(1.0-wy)
+    ay=ey0(i,j)*wx*wy+ey0(i+1,j)*(1.0-wx)*wy+&
+      ey0(i,j+1)*wx*(1.0-wy)+ey0(i+1,j+1)*(1.0-wx)*(1.0-wy)
     ! weight equation terms
-    vdv=vx1(m)**2+vy1(m)**2+vz1(m)**2
-    edv=vx1(m)*ax+vy1(m)*ay
+    vdv=vx0(m)**2+vy0(m)**2+vz0(m)**2
+    edv=vx0(m)*ax+vy0(m)*ay
     kap=kapn+kapt*(.5*vdv-1.5)
     ! implicit weight advance
     w1(m)=w0(m)+.5*dt*(1-w1(m)*wnlin)*(edv+cth*ay*kap)
