@@ -32,14 +32,12 @@ module li_com
 
 ! particle array declarations
   real(8),dimension(:),allocatable :: x0,y0,vx0,vy0,vz0
-  real(8),dimension(:),allocatable :: x1,y1,vx1,vy1,vz1
   real(8),dimension(:),allocatable :: w0,w1
 
 ! grid array declarations
-  real(8),dimension(:,:),allocatable :: den0,den1,dent
-  real(8),dimension(:,:),allocatable :: phi0,phi1,coeff
+  real(8),dimension(:,:),allocatable :: den0,denlast
+  real(8),dimension(:,:),allocatable :: phi0,coeff
   real(8),dimension(:,:),allocatable :: ex0,ey0
-  real(8),dimension(:,:),allocatable :: ex1,ey1
   real(8),dimension(:,:),allocatable :: tempxy
 
 ! ky=0 quantities
@@ -67,15 +65,12 @@ subroutine init_com
 ! particle allocation
   allocate(x0(1:ni),y0(1:ni))
   allocate(vx0(1:ni),vy0(1:ni),vz0(1:ni))
-  allocate(x1(1:ni),y1(1:ni))
-  allocate(vx1(1:ni),vy1(1:ni),vz1(1:ni))
   allocate(w0(1:ni),w1(1:ni))
 
 ! grid allocation
-  allocate(den0(0:nx,0:ny),den1(0:nx,0:ny),dent(0:nx,0:ny))
-  allocate(phi0(0:nx,0:ny),phi1(0:nx,0:ny),coeff(0:nx-1,0:ny-1))
+  allocate(den0(0:nx,0:ny),denlast(0:nx,0:ny))
+  allocate(phi0(0:nx,0:ny),coeff(0:nx-1,0:ny-1))
   allocate(ex0(0:nx,0:ny),ey0(0:nx,0:ny))
-  allocate(ex1(0:nx,0:ny),ey1(0:nx,0:ny))
   allocate(tempxy(0:nx,0:ny))
 
 ! ky=0 quantities
@@ -99,15 +94,12 @@ subroutine finalize_com
 ! particle deallocation
   deallocate(x0,y0)
   deallocate(vx0,vy0,vz0)
-  deallocate(x1,y1)
-  deallocate(vx1,vy1,vz1)
   deallocate(w0,w1)
 
 ! grid deallocation
-  deallocate(den0,den1,dent)
-  deallocate(phi0,phi1,coeff)
+  deallocate(den0,denlast)
+  deallocate(phi0,coeff)
   deallocate(ex0,ey0)
-  deallocate(ex1,ey1)
   deallocate(tempxy)
 
 ! ky=0 quantities

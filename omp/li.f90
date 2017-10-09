@@ -18,7 +18,6 @@ program li
   call load
   call accumulate
   call field
-  call update_wrapper
 
   !main loop
   do timestep=1,nt
@@ -40,7 +39,7 @@ program li
       if (doprint.eq.1) print *,'residual =',res
     end do
 
-    call update_wrapper
+    w0=w1
 
     call temperature
 
@@ -48,8 +47,8 @@ program li
     call modeout(phihist,'phist',11)
     call modeout(denhist,'dhist',12)
     call modeout(temphist,'thist',13)
-    call diagnostics
-    call zdiagnostics
+    !call diagnostics
+    !call zdiagnostics
     if (mod(timestep,nrec).eq.0) then
       call gridout(phi0,'phixy',14)
       call gridout(den0,'denxy',15)
@@ -150,41 +149,21 @@ end
 
 !-----------------------------------------------------------------------
 
-subroutine update_wrapper
-
-  implicit none
-
-  x0=x1
-  y0=y1
-  vx0=vx1
-  vy0=vy1
-  vz0=vz1
-  w0=w1
-
-  den0=den1
-  phi0=phi1
-
-  ex0=ex1
-  ey0=ey1
-
-end
-
-!-----------------------------------------------------------------------
-
 subroutine load
 
   integer :: m
 
   do m=1,ni
 !   load particle positions
-    x1(m)=lx*revers(m,2)
-    y1(m)=ly*(dble(m)-0.5)/dble(ni)
+    x0(m)=lx*revers(m,2)
+    y0(m)=ly*(dble(m)-0.5)/dble(ni)
 !   load maxwellian velocities
-    vx1(m)=dinvnorm(revers(m,3))
-    vy1(m)=dinvnorm(revers(m,5))
-    vz1(m)=dinvnorm(revers(m,7))
+    vx0(m)=dinvnorm(revers(m,3))
+    vy0(m)=dinvnorm(revers(m,5))
+    vz0(m)=dinvnorm(revers(m,7))
 !   initialize weights
-    w1(m)=amp*dsin(pi2*x1(m)/lx)*dsin(pi2*y1(m)/ly)
+    w0(m)=amp*dsin(pi2*x0(m)/lx)*dsin(pi2*y0(m)/ly)
+    w1(m)=w0(m)
   end do
 
 end
@@ -200,41 +179,41 @@ subroutine accumulate
   real(8) :: wx,wy
   integer :: i,j,m
 
-  dent=den1
-  den1=0
+  denlast=den0
+  den0=0
 
-!$OMP PARALLEL DO IF(openmp==1) SCHEDULE(static) PRIVATE(xpdx,ypdy,wx,wy,i,j,m) REDUCTION(+:den1)
+!$OMP PARALLEL DO IF(openmp==1) SCHEDULE(static) PRIVATE(xpdx,ypdy,wx,wy,i,j,m) REDUCTION(+:den0)
   do m=1,ni
-    xpdx=x1(m)/dx
-    ypdy=y1(m)/dy
+    xpdx=x0(m)/dx
+    ypdy=y0(m)/dy
     i=int(xpdx)
     j=int(ypdy)
     wx=dble(i+1)-xpdx
     wy=dble(j+1)-ypdy
-    den1(i,j)=den1(i,j)+w1(m)*wx*wy
-    den1(i+1,j)=den1(i+1,j)+w1(m)*(1.0-wx)*wy
-    den1(i,j+1)=den1(i,j+1)+w1(m)*wx*(1.0-wy)
-    den1(i+1,j+1)=den1(i+1,j+1)+w1(m)*(1.0-wx)*(1.0-wy)
+    den0(i,j)=den0(i,j)+w1(m)*wx*wy
+    den0(i+1,j)=den0(i+1,j)+w1(m)*(1.0-wx)*wy
+    den0(i,j+1)=den0(i,j+1)+w1(m)*wx*(1.0-wy)
+    den0(i+1,j+1)=den0(i+1,j+1)+w1(m)*(1.0-wx)*(1.0-wy)
   end do
 !$OMP END PARALLEL DO
 
   !divide by particles per cell
-  den1=den1*nx*ny/ni
+  den0=den0*nx*ny/ni
 
   do i=0,nx
-    den1(i,0)=den1(i,0)+den1(i,ny)
-    den1(i,ny)=den1(i,0)
+    den0(i,0)=den0(i,0)+den0(i,ny)
+    den0(i,ny)=den0(i,0)
   end do
 
   do j=0,ny
-    den1(0,j)=den1(0,j)+den1(nx,j)
-    den1(nx,j)=den1(0,j)
+    den0(0,j)=den0(0,j)+den0(nx,j)
+    den0(nx,j)=den0(0,j)
   end do
 
   if ((timestep.le.ninit).and.(initphi.eq.1)) then
     do i=0,nx
       do j=0,ny
-        den1(i,j)=amp*dsin(pi*i/nx)*dsin(pi2*j/ny)
+        den0(i,j)=amp*dsin(pi*i/nx)*dsin(pi2*j/ny)
       end do
     end do
   end if
@@ -254,7 +233,7 @@ subroutine field
   complex(8) :: ex(0:nx-1,0:ny-1),ey(0:nx-1,0:ny-1)
 
   !set potential equal to density and transform to k-space
-  phi = den1(0:nx-1,0:ny-1)
+  phi = den0(0:nx-1,0:ny-1)
 
   do j=0,ny-1
     call ccfft('x',-1,nx,phi(:,j))
@@ -334,17 +313,17 @@ subroutine field
   end do
 
   !store final phi,e-field
-  phi1(0:nx-1,0:ny-1)=real(phi)
-  ex1(0:nx-1,0:ny-1)=real(ex)
-  ey1(0:nx-1,0:ny-1)=real(ey)
+  phi0(0:nx-1,0:ny-1)=real(phi)
+  ex0(0:nx-1,0:ny-1)=real(ex)
+  ey0(0:nx-1,0:ny-1)=real(ey)
 
   !periodic boundaries
-  phi1(:,ny)=phi1(:,0)
-  phi1(nx,:)=phi1(0,:)
-  ex1(:,ny)=ex1(:,0)
-  ex1(nx,:)=ex1(0,:)
-  ey1(:,ny)=ey1(:,0)
-  ey1(nx,:)=ey1(0,:)
+  phi0(:,ny)=phi0(:,0)
+  phi0(nx,:)=phi0(0,:)
+  ex0(:,ny)=ex0(:,0)
+  ex0(nx,:)=ex0(0,:)
+  ey0(:,ny)=ey0(:,0)
+  ey0(nx,:)=ey0(0,:)
 
   return
 
@@ -363,8 +342,8 @@ subroutine residual
 
   do i=0,nx
     do j=0,ny
-      res = res + (den1(i,j)-dent(i,j))**2
-      norm = norm + den1(i,j)**2
+      res = res + (den0(i,j)-denlast(i,j))**2
+      norm = norm + den0(i,j)**2
     end do
   end do
   res = (res/norm)**.5
@@ -383,6 +362,11 @@ subroutine epush
   real(8) :: ax,ay
   real(8) :: wx,wy
   real(8) :: xpdx,ypdy
+  real(8) :: vxt,vyt !temp velocity storage
+
+!do full Boris velocity advance
+!do 1st 1/2 weight advance
+!do full Boris position advance
 
 !$OMP PARALLEL DO IF(openmp==1) SCHEDULE(static) PRIVATE(m,i,j,vdv,kap,edv,ax,ay,wx,wy,xpdx,ypdy)
   do m=1,ni
@@ -393,33 +377,39 @@ subroutine epush
     j=int(ypdy)
     wx=dble(i+1)-xpdx
     wy=dble(j+1)-ypdy
-    ! acceleration
+    ! interpolate e-field
     ax=ex0(i,j)*wx*wy+ex0(i+1,j)*(1.0-wx)*wy+&
       ex0(i,j+1)*wx*(1.0-wy)+ex0(i+1,j+1)*(1.0-wx)*(1.0-wy)
     ay=ey0(i,j)*wx*wy+ey0(i+1,j)*(1.0-wx)*wy+&
       ey0(i,j+1)*wx*(1.0-wy)+ey0(i+1,j+1)*(1.0-wx)*(1.0-wy)
+    ! 1/2 velocity push
+    vx0(m)=vx0(m)+.5*dt*ax*enlin
+    vy0(m)=vy0(m)+.5*dt*ay*enlin
+    ! full velocity rotation (theta,dt,-theta)
+    vxt=cdt*vx0(m)+sdt*cth*vy0(m)-sdt*sth*vz0(m)
+    vyt=-1.0*sdt*cth*vx0(m)+(cdt*cth**2+sth**2)*vy0(m)&
+      +(-1.0*cdt*sth*cth+sth*cth)*vz0(m)
+    vz0(m)=sdt*sth*vx0(m)+(-1.0*cdt*sth*cth+sth*cth)*vy0(m)&
+      +(cdt*sth**2+cth**2)*vz0(m)
+    vx0(m)=vxt
+    vy0(m)=vyt
+    ! 1/2 velocity push
+    vx0(m)=vx0(m)+.5*dt*ax*enlin
+    vy0(m)=vy0(m)+.5*dt*ay*enlin
     ! weight equation terms
     vdv=vx0(m)**2+vy0(m)**2+vz0(m)**2
     edv=vx0(m)*ax+vy0(m)*ay
     kap=kapn+kapt*(.5*vdv-1.5)
-    ! explicit weight advance
+    ! explicit 1/2 weight advance
     w0(m)=w0(m)+.5*dt*(1-w0(m)*wnlin)*(edv+cth*ay*kap)
-    ! explicit position advance
-    x0(m)=x0(m)+.5*dt*vx0(m)
-    y0(m)=y0(m)+.5*dt*vy0(m)
-    ! explicit velocity advance e-field
-    vx0(m)=vx0(m)+.5*dt*ax*enlin
-    vy0(m)=vy0(m)+.5*dt*ay*enlin
-    ! full explicit velocity rotation
-    ! rotation by theta + dt + -theta
-    vx1(m)=cdt*vx0(m)+sdt*cth*vy0(m)-sdt*sth*vz0(m)
-    vy1(m)=-1.0*sdt*cth*vx0(m)+(cdt*cth**2+sth**2)*vy0(m)&
-      +(-1.0*cdt*sth*cth+sth*cth)*vz0(m)
-    vz1(m)=sdt*sth*vx0(m)+(-1.0*cdt*sth*cth+sth*cth)*vy0(m)&
-      +(cdt*sth**2+cth**2)*vz0(m)
-    vx0(m)=vx1(m)
-    vy0(m)=vy1(m)
+    ! full position advance
+    x0(m)=x0(m)+dt*vx0(m)
+    y0(m)=y0(m)+dt*vy0(m)
+    ! periodic boundaries
+    x0(m)=x0(m)-lx*dble(floor(x0(m)/lx))
+    y0(m)=y0(m)-ly*dble(floor(y0(m)/ly))
   end do
+
 !$OMP END PARALLEL DO
 
 end
@@ -435,34 +425,25 @@ subroutine ipush
   real(8) :: wx,wy
   real(8) :: xpdx,ypdy
 
+!do 2nd 1/2 weight advance (implicit part)
+
 !$OMP PARALLEL DO IF(openmp==1) SCHEDULE(static) PRIVATE(m,i,j,vdv,kap,edv,ax,ay,wx,wy,xpdx,ypdy)
   do m=1,ni
-    ! implicit position advance
-    x1(m)=x0(m)+.5*dt*vx1(m)
-    y1(m)=y0(m)+.5*dt*vy1(m)
-    ! periodic boundaries
-    x0(m)=x0(m)-lx*dble(floor(x0(m)/lx))
-    y0(m)=y0(m)-ly*dble(floor(y0(m)/ly))
-    x1(m)=x1(m)-lx*dble(floor(x1(m)/lx))
-    y1(m)=y1(m)-ly*dble(floor(y1(m)/ly))
     ! interpolation weights
-    xpdx=x1(m)/dx
-    ypdy=y1(m)/dy
+    xpdx=x0(m)/dx
+    ypdy=y0(m)/dy
     i=int(xpdx)
     j=int(ypdy)
     wx=dble(i+1)-xpdx
     wy=dble(j+1)-ypdy
-    ! acceleration
-    ax=ex1(i,j)*wx*wy+ex1(i+1,j)*(1.0-wx)*wy+&
-      ex1(i,j+1)*wx*(1.0-wy)+ex1(i+1,j+1)*(1.0-wx)*(1.0-wy)
-    ay=ey1(i,j)*wx*wy+ey1(i+1,j)*(1.0-wx)*wy+&
-      ey1(i,j+1)*wx*(1.0-wy)+ey1(i+1,j+1)*(1.0-wx)*(1.0-wy)
-    ! implicit velocity advance e-field
-    vx1(m)=vx0(m)+.5*dt*ax*enlin
-    vy1(m)=vy0(m)+.5*dt*ay*enlin
+    ! interpolate e-field
+    ax=ex0(i,j)*wx*wy+ex0(i+1,j)*(1.0-wx)*wy+&
+      ex0(i,j+1)*wx*(1.0-wy)+ex0(i+1,j+1)*(1.0-wx)*(1.0-wy)
+    ay=ey0(i,j)*wx*wy+ey0(i+1,j)*(1.0-wx)*wy+&
+      ey0(i,j+1)*wx*(1.0-wy)+ey0(i+1,j+1)*(1.0-wx)*(1.0-wy)
     ! weight equation terms
-    vdv=vx1(m)**2+vy1(m)**2+vz1(m)**2
-    edv=vx1(m)*ax+vy1(m)*ay
+    vdv=vx0(m)**2+vy0(m)**2+vz0(m)**2
+    edv=vx0(m)*ax+vy0(m)*ay
     kap=kapn+kapt*(.5*vdv-1.5)
     ! implicit weight advance
     w1(m)=w0(m)+.5*dt*(1-w1(m)*wnlin)*(edv+cth*ay*kap)
@@ -485,18 +466,18 @@ subroutine temperature
 
   tempxy=0
 
-!$OMP PARALLEL DO IF(openmp==1) SCHEDULE(static) PRIVATE(xpdx,ypdy,wx,wy,i,j,m) REDUCTION(+:den1)
+!$OMP PARALLEL DO IF(openmp==1) SCHEDULE(static) PRIVATE(xpdx,ypdy,wx,wy,i,j,m) REDUCTION(+:den0)
   do m=1,ni
-    xpdx=x1(m)/dx
-    ypdy=y1(m)/dy
+    xpdx=x0(m)/dx
+    ypdy=y0(m)/dy
     i=int(xpdx)
     j=int(ypdy)
     wx=dble(i+1)-xpdx
     wy=dble(j+1)-ypdy
-    tempxy(i,j)=tempxy(i,j)+w1(m)*wx*wy*(vx1(m)**2+(cth*vy1(m)-sth*vz1(m))**2)
-    tempxy(i+1,j)=tempxy(i+1,j)+w1(m)*(1.0-wx)*wy*(vx1(m)**2+(cth*vy1(m)-sth*vz1(m))**2)
-    tempxy(i,j+1)=tempxy(i,j+1)+w1(m)*wx*(1.0-wy)*(vx1(m)**2+(cth*vy1(m)-sth*vz1(m))**2)
-    tempxy(i+1,j+1)=tempxy(i+1,j+1)+w1(m)*(1.0-wx)*(1.0-wy)*(vx1(m)**2+(cth*vy1(m)-sth*vz1(m))**2)
+    tempxy(i,j)=tempxy(i,j)+w1(m)*wx*wy*(vx0(m)**2+(cth*vy0(m)-sth*vz0(m))**2)
+    tempxy(i+1,j)=tempxy(i+1,j)+w1(m)*(1.0-wx)*wy*(vx0(m)**2+(cth*vy0(m)-sth*vz0(m))**2)
+    tempxy(i,j+1)=tempxy(i,j+1)+w1(m)*wx*(1.0-wy)*(vx0(m)**2+(cth*vy0(m)-sth*vz0(m))**2)
+    tempxy(i+1,j+1)=tempxy(i+1,j+1)+w1(m)*(1.0-wx)*(1.0-wy)*(vx0(m)**2+(cth*vy0(m)-sth*vz0(m))**2)
   end do
 !$OMP END PARALLEL DO
 
@@ -607,7 +588,7 @@ subroutine diagnostics
 !$OMP PARALLEL DO IF(openmp==1) SCHEDULE(static) PRIVATE(m) REDUCTION(+:qx,wtot)
   do m=1,ni
     !net heat flux in x-direction
-    qx = qx + w1(m)*vx1(m)*(vx1(m)**2+vy1(m)**2+vz1(m)**2)
+    qx = qx + w1(m)*vx0(m)*(vx0(m)**2+vy0(m)**2+vz0(m)**2)
     !!!!!
     !net x heat flux using e cross b
     ! interpolation weights
@@ -621,7 +602,7 @@ subroutine diagnostics
     !ay=ey0(i,j)*wx*wy+ey0(i+1,j)*(1.0-wx)*wy+&
     !  ey0(i,j+1)*wx*(1.0-wy)+ey0(i+1,j+1)*(1.0-wx)*(1.0-wy)
     ! heat flux
-    !qx = qx + w1(m)*ay*(vx1(m)**2+vy1(m)**2+vz1(m)**2)
+    !qx = qx + w1(m)*ay*(vx0(m)**2+vy0(m)**2+vz0(m)**2)
     !!!!!
     !weight squared sum
     wtot = wtot + w1(m)**2
@@ -657,17 +638,17 @@ subroutine zdiagnostics
 
 !$OMP PARALLEL DO IF(openmp==1) SCHEDULE(static) PRIVATE(xpdx,wx,i,m) REDUCTION(+:uy,uz,px,py)
   do m=1,ni
-    xpdx=x1(m)/dx
+    xpdx=x0(m)/dx
     i=int(xpdx)
     wx=dble(i+1)-xpdx
-    uy(i)=uy(i)+w1(m)*wx*vy1(m)
-    uy(i+1)=uy(i+1)+w1(m)*(1.0-wx)*vy1(m)
-    uz(i)=uz(i)+w1(m)*wx*vz1(m)
-    uz(i+1)=uz(i+1)+w1(m)*(1.0-wx)*vz1(m)
-    px(i)=px(i)+w1(m)*wx*vx1(m)**2
-    px(i+1)=px(i+1)+w1(m)*(1.0-wx)*vx1(m)**2
-    py(i)=py(i)+w1(m)*wx*(cth*vy1(m)-sth*vz1(m))**2
-    py(i+1)=py(i+1)+w1(m)*(1.0-wx)*(cth*vy1(m)-sth*vz1(m))**2
+    uy(i)=uy(i)+w1(m)*wx*vy0(m)
+    uy(i+1)=uy(i+1)+w1(m)*(1.0-wx)*vy0(m)
+    uz(i)=uz(i)+w1(m)*wx*vz0(m)
+    uz(i+1)=uz(i+1)+w1(m)*(1.0-wx)*vz0(m)
+    px(i)=px(i)+w1(m)*wx*vx0(m)**2
+    px(i+1)=px(i+1)+w1(m)*(1.0-wx)*vx0(m)**2
+    py(i)=py(i)+w1(m)*wx*(cth*vy0(m)-sth*vz0(m))**2
+    py(i+1)=py(i+1)+w1(m)*(1.0-wx)*(cth*vy0(m)-sth*vz0(m))**2
   end do
 !$OMP END PARALLEL DO
 

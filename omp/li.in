@@ -3,10 +3,10 @@
 '**********************************************************************'
                                                                        
 '  nx          ny          nt          tol                             '
-   16          16          10000       1d-14
+   32          32          50000       1d-4
                                                                       
 '  lx          ly          dt          theta                           '
-   16          16          0.1         0.01
+   62.832      15.708      0.2         0.01
                                                                  
 '  ni          amp         initphi     ninit                           '
    65536       1d-4        0           50
@@ -15,13 +15,13 @@
    0.0         0.05        1.0         0.01
 
 '  bounded     enlin       wnlin       openmp                          '
-   1           1           0           1
+   1           0           0           1
 
 '  isolate     zflow       xshape      yshape                          '
-   0           1           1.0         1.0
+   1           0           0.0         0.0
                                                                        
 '  nrec        nprint      nmode                                       '
-   100         10          2
+   100         100         2
 
 '  mode1(i,j)  mode2(i,j)  ...                                         '
    1 1         2 0 
