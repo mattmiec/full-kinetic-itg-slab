@@ -149,9 +149,8 @@ subroutine initialize
       ky = 2*pi*kj/ly
       kp2 = kx*kx + ky*ky
       filt = exp(-1*(xshape**2*kx**2+yshape**2*ky**2)**2)
-      if ((kj==0).and.(ki/=0)) coeff(i,j) = float(zflow)*filt/(memi*tets*kp2) !ky=0
+      if (((kj==0).and.(ki/=0)).and.((odd==1).or.(mod(ki,2)==1))) coeff(i,j) = float(zflow)*filt/(memi*tets*kp2) !ky=0
       if ((kj/=0).and.(ki/=0)) coeff(i,j) = filt !ky/=0
-      if ((odd/=1).and.(mod(ki,2)==1)) coeff(i,j) = 0.
     end do
   end do
 
