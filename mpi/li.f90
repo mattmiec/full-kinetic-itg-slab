@@ -22,7 +22,6 @@ program li
   call load
   call accumulate
   call field
-  call update_wrapper
 
   !main loop
   do timestep=1,nt
@@ -52,8 +51,8 @@ program li
     call modeout(phihist,'phist',11)
     call modeout(denhist,'dhist',12)
     call modeout(temphist,'thist',13)
-    call diagnostics
-    call zdiagnostics
+    !call diagnostics
+    !call zdiagnostics
     if (mod(timestep,nrec).eq.0) then
       call gridout(phi0,'phixy',14)
       call gridout(den0,'denxy',15)
@@ -174,6 +173,7 @@ subroutine load
     vz0(m)=dinvnorm(revers(myid*ni+m,7))
 !   initialize weights
     w0(m)=amp*dsin(pi2*x0(m)/lx)*dsin(pi2*y0(m)/ly)
+    w1(m)=w0(m)
   end do
 
 end
