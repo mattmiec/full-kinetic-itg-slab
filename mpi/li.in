@@ -14,8 +14,8 @@
 '  kappan      kappat      tets        memi                            '
    0.0         0.05        1.0         0.01
 
-'  bounded     enlin       wnlin                                       '
-   1           1           0
+'  bounded     enlin       wnlin       odd                             '
+   1           1           0           1
 
 '  isolate     zflow       xshape      yshape                          '
    1           1           0.0         0.0

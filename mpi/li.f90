@@ -106,7 +106,7 @@ subroutine initialize
       read(115,*) dumchar
       read(115,*) kapn,kapt,tets,memi
       read(115,*) dumchar
-      read(115,*) bounded,enlin,wnlin
+      read(115,*) bounded,enlin,wnlin,odd
       read(115,*) dumchar
       read(115,*) isolate,zflow,xshape,yshape
       read(115,*) dumchar
@@ -151,6 +151,7 @@ subroutine initialize
       filt = exp(-1*(xshape**2*kx**2+yshape**2*ky**2)**2)
       if ((kj==0).and.(ki/=0)) coeff(i,j) = float(zflow)*filt/(memi*tets*kp2) !ky=0
       if ((kj/=0).and.(ki/=0)) coeff(i,j) = filt !ky/=0
+      if ((odd/=1).and.(mod(ki,2)==1)) coeff(i,j) = 0.
     end do
   end do
 

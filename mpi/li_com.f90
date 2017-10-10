@@ -8,7 +8,7 @@ module li_com
   real(8) :: tol,lx,ly,dt,theta,amp
   integer :: tni,initphi,ninit
   real(8) :: kapn,kapt,tets,memi
-  integer :: bounded,enlin,wnlin,isolate,zflow
+  integer :: bounded,enlin,wnlin,isolate,zflow,odd
   real(8) :: xshape,yshape
   integer :: nrec,nprint,nmode
   integer,dimension(:,:),allocatable :: modeindices
