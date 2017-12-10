@@ -41,19 +41,19 @@ program li
 
     w0=w1
 
-    call temperature
+    !call temperature
 
     !file output
     call modeout(phihist,'phist',11)
-    call modeout(denhist,'dhist',12)
-    call modeout(temphist,'thist',13)
+    !call modeout(denhist,'dhist',12)
+    !call modeout(temphist,'thist',13)
     !call diagnostics
     !call zdiagnostics
-    if (mod(timestep,nrec).eq.0) then
-      call gridout(phi0,'phixy',14)
-      call gridout(den0,'denxy',15)
-      call gridout(tempxy,'temxy',16)
-    end if
+    !if (mod(timestep,nrec).eq.0) then
+      !call gridout(phi0,'phixy',14)
+      !call gridout(den0,'denxy',15)
+      !call gridout(tempxy,'temxy',16)
+    !end if
 
   end do
 
