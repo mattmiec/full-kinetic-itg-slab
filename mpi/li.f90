@@ -187,7 +187,7 @@ subroutine load
     xe1(m)=lx*revers(myid*ne+m,2)
     ye1(m)=ly*(dble(myid*ne+m)-0.5)/dble(tne)
 !   load maxwellian velocities
-    vpe(m)=dinvnorm(revers(myid*ne+m,3))
+    vpe(m)=dinvnorm(revers(myid*ne+m,3))/sqrt(memi)
 !   initialize weights
     we1(m)=amp*dsin(pi2*xe1(m)/lx)*dsin(pi2*ye1(m)/ly)
   end do
@@ -472,7 +472,7 @@ subroutine epush
     ay=ey(i,j)*wx*wy+ey(i+1,j)*(1.0-wx)*wy+&
       ey(i,j+1)*wx*(1.0-wy)+ey(i+1,j+1)*(1.0-wx)*(1.0-wy)
     ! full parallel velocity push
-    vpe(m)=vpe(m)-dt*ay*sth*enlin
+    vpe(m)=vpe(m)-dt*ay*sth*enlin/memi
     ! explicit part of weight advance
     we0(m)=we0(m)-.5*dt*(1-we0(m)*wnlin)*(sth*ay*vpe(m))
     ! explicit part of position advance
