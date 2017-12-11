@@ -20,6 +20,7 @@ program li
   !initialization
   call initialize
   call load
+  call update
   call accumulate
   call field
 
@@ -164,6 +165,7 @@ end
 
 subroutine load
 
+  implicit none
   integer :: m
 
   ! ions
@@ -180,17 +182,15 @@ subroutine load
   end do
 
   ! electrons
-  do m=1,ni
+  do m=1,ne
 !   load particle positions
-    xe1(m)=lx*revers(myid*ni+m,2)
-    ye1(m)=ly*(dble(myid*ni+m)-0.5)/dble(tni)
+    xe1(m)=lx*revers(myid*ne+m,2)
+    ye1(m)=ly*(dble(myid*ne+m)-0.5)/dble(tne)
 !   load maxwellian velocities
-    vpe(m)=dinvnorm(revers(myid*ni+m,3))
+    vpe(m)=dinvnorm(revers(myid*ne+m,3))
 !   initialize weights
-    we1(m)=amp*dsin(pi2*xe(m)/lx)*dsin(pi2*ye(m)/ly)
+    we1(m)=amp*dsin(pi2*xe1(m)/lx)*dsin(pi2*ye1(m)/ly)
   end do
-
-  call update
 
 end
 
@@ -280,34 +280,34 @@ subroutine field
   implicit none
   integer :: i,j,ki,kj
   real(8) :: kx,ky
-  complex(8) :: phi(0:nx-1,0:ny-1)
-  complex(8) :: ex(0:nx-1,0:ny-1),ey(0:nx-1,0:ny-1)
+  complex(8) :: phit(0:nx-1,0:ny-1)
+  complex(8) :: ext(0:nx-1,0:ny-1),eyt(0:nx-1,0:ny-1)
 
   !set potential equal to density and transform to k-space
-  phi = den(0:nx-1,0:ny-1)
+  phit = den(0:nx-1,0:ny-1)
 
   do j=0,ny-1
-    call ccfft('x',-1,nx,phi(:,j))
+    call ccfft('x',-1,nx,phit(:,j))
   end do
 
   do i=0,nx-1
-    call ccfft('y',-1,ny,phi(i,:))
+    call ccfft('y',-1,ny,phit(i,:))
   end do
 
   !normalize
-  phi=phi/nx/ny
+  phit=phit/nx/ny
 
   !record selected density modes
   do i=1,nmode
-    denhist(i) = phi(modeindices(1,i),modeindices(2,i))
+    denhist(i) = phit(modeindices(1,i),modeindices(2,i))
   end do
 
   !(optional) enforce phi=0 at x=0 and x=lx/2
   if (bounded==1) then
     do i=1,nx/2
       do j=0,ny-1
-        phi(i,j)=(phi(i,j)-phi(nx-i,j))/2
-        phi(nx-i,j)=-1*phi(i,j)
+        phit(i,j)=(phit(i,j)-phit(nx-i,j))/2
+        phit(nx-i,j)=-1*phit(i,j)
       end do
     end do
   end if
@@ -315,13 +315,13 @@ subroutine field
   !calculate phi with coefficients calculated during initialization
   do i=1,nx-1
     do j=0,ny-1
-      phi(i,j) = coeff(i,j)*phi(i,j)
+      phit(i,j) = coeff(i,j)*phit(i,j)
     end do
   end do
 
   !record selected modes
   do i=1,nmode
-    phihist(i) = phi(modeindices(1,i),modeindices(2,i))
+    phihist(i) = phit(modeindices(1,i),modeindices(2,i))
   end do
 
   !(optional) remove all modes except (1,1)=-(-1,1) and (2,0)
@@ -331,7 +331,7 @@ subroutine field
         ki = min(i,nx-i)
         kj = min(j,ny-j)
         if (((ki/=1).or.(kj/=1)).and.((ki/=2).or.(kj/=0))) then
-          phi(i,j)=0
+          phit(i,j)=0
         end if
       end do
     end do
@@ -344,29 +344,29 @@ subroutine field
       if (i>nx/2) kx = -2*pi*(nx-i)/lx
       if (j<=ny/2) ky = 2*pi*j/ly
       if (j>ny/2) ky = -2*pi*(ny-j)/ly
-      ex(i,j) = -IU*kx*tets*phi(i,j)
-      ey(i,j) = -IU*ky*tets*phi(i,j)
+      ext(i,j) = -IU*kx*tets*phit(i,j)
+      eyt(i,j) = -IU*ky*tets*phit(i,j)
     end do
   end do
 
   do i=0,nx-1
-    call ccfft('y',1,ny,phi(i,:))
-    call ccfft('y',1,ny,ex(i,:))
-    call ccfft('y',1,ny,ey(i,:))
+    call ccfft('y',1,ny,phit(i,:))
+    call ccfft('y',1,ny,ext(i,:))
+    call ccfft('y',1,ny,eyt(i,:))
 
   end do
 
   do j=0,ny-1
-    call ccfft('x',1,nx,phi(:,j))
-    call ccfft('x',1,nx,ex(:,j))
-    call ccfft('x',1,nx,ey(:,j))
+    call ccfft('x',1,nx,phit(:,j))
+    call ccfft('x',1,nx,ext(:,j))
+    call ccfft('x',1,nx,eyt(:,j))
 
   end do
 
   !store final phi,e-field
-  phi(0:nx-1,0:ny-1)=real(phi)
-  ex(0:nx-1,0:ny-1)=real(ex)
-  ey(0:nx-1,0:ny-1)=real(ey)
+  phi(0:nx-1,0:ny-1)=real(phit)
+  ex(0:nx-1,0:ny-1)=real(ext)
+  ey(0:nx-1,0:ny-1)=real(eyt)
 
   !periodic boundaries
   phi(:,ny)=phi(:,0)
@@ -460,8 +460,8 @@ subroutine epush
   ! electrons
   do m=1,ne
     ! interpolation weights
-    xpdx=xe(m)/dx
-    ypdy=ye(m)/dy
+    xpdx=xe0(m)/dx
+    ypdy=ye0(m)/dy
     i=int(xpdx)
     j=int(ypdy)
     wx=dble(i+1)-xpdx
@@ -476,8 +476,8 @@ subroutine epush
     ! explicit part of weight advance
     we0(m)=we0(m)-.5*dt*(1-we0(m)*wnlin)*(sth*ay*vpe(m))
     ! explicit part of position advance
-    xe0=xe0+.5*dt*ay*cth
-    ye0=ye0-.5*dt*ax*cth+dt*sth*vpe(m)
+    xe0(m)=xe0(m)+.5*dt*ay*cth
+    ye0(m)=ye0(m)-.5*dt*ax*cth+dt*sth*vpe(m)
     ! periodic boundaries
     xe0(m)=xe0(m)-lx*dble(floor(xe0(m)/lx))
     ye0(m)=ye0(m)-ly*dble(floor(ye0(m)/ly))
@@ -520,8 +520,8 @@ subroutine ipush
   ! electrons
   do m=1,ne
     ! interpolation weights
-    xpdx=xe(m)/dx
-    ypdy=ye(m)/dy
+    xpdx=xe1(m)/dx
+    ypdy=ye1(m)/dy
     i=int(xpdx)
     j=int(ypdy)
     wx=dble(i+1)-xpdx
@@ -534,8 +534,8 @@ subroutine ipush
     ! implicit part of weight advance
     we1(m)=we0(m)-.5*dt*(1-we1(m)*wnlin)*(sth*ay*vpe(m))
     ! implicit part of position advance
-    xe1=xe0+.5*dt*ay*cth
-    ye1=ye0-.5*dt*ax*cth
+    xe1(m)=xe0(m)+.5*dt*ay*cth
+    ye1(m)=ye0(m)-.5*dt*ax*cth
     ! periodic boundaries
     xe1(m)=xe1(m)-lx*dble(floor(xe1(m)/lx))
     ye1(m)=ye1(m)-ly*dble(floor(ye1(m)/ly))
@@ -546,6 +546,8 @@ end
 !-----------------------------------------------------------------------
 
 subroutine update
+
+  implicit none
 
   wi0 = wi1
   xe0 = xe1
