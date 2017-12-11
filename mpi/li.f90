@@ -43,7 +43,7 @@ program li
       if (doprint.eq.1) print *,'residual =',res
     end do
 
-    w0=w1
+    call update
 
     call temperature
 
@@ -54,8 +54,10 @@ program li
     !call diagnostics
     !call zdiagnostics
     if (mod(timestep,nrec).eq.0) then
-      call gridout(phi0,'phixy',14)
-      call gridout(den0,'denxy',15)
+      call gridout(phi,'phixy',14)
+      call gridout(den,'denxy',15)
+      call gridout(deni,'denii',17)
+      call gridout(dene,'denee',18)
       call gridout(tempxy,'temxy',16)
     end if
 
@@ -80,7 +82,7 @@ program li
 contains
 
 !-----------------------------------------------------------------------
-!---------initialize subroutines----------------------------------------
+!---------initialization subroutines------------------------------------
 !-----------------------------------------------------------------------
 
 subroutine initialize
@@ -98,11 +100,13 @@ subroutine initialize
       read(115,*) dumchar
       read(115,*) dumchar
       read(115,*) dumchar
+      read(115,*) ni,ne
+      read(115,*) dumchar
       read(115,*) nx,ny,nt,tol
       read(115,*) dumchar
       read(115,*) lx,ly,dt,theta
       read(115,*) dumchar
-      read(115,*) tni,amp,initphi,ninit
+      read(115,*) amp,initphi,ninit
       read(115,*) dumchar
       read(115,*) kapn,kapt,tets,memi
       read(115,*) dumchar
@@ -111,8 +115,8 @@ subroutine initialize
       read(115,*) isolate,zflow,xshape,yshape
       read(115,*) dumchar
       read(115,*) nrec,nprint,nmode
-      ni=tni/nproc !particles per proc
-      tni=ni*nproc !actual total particle number
+      tni=ni*nproc !total ions
+      tne=ne*nproc !total electrons
       call init_com
       read(115,*) dumchar
       read(115,*) modeindices
@@ -135,7 +139,7 @@ subroutine initialize
   iseed=-(1777)
   idum=ran2(iseed)
 
-! intialize fourier transform subrourtines
+! intialize fourier transform subroutines
   call ccfft('x',0,nx,tmpx)
   call ccfft('y',0,ny,tmpy)
 
@@ -149,8 +153,7 @@ subroutine initialize
       ky = 2*pi*kj/ly
       kp2 = kx*kx + ky*ky
       filt = exp(-1*(xshape**2*kx**2+yshape**2*ky**2)**2)
-      if (((kj==0).and.(ki/=0)).and.((odd==1).or.(mod(ki,2)==1))) coeff(i,j) = float(zflow)*filt/(memi*tets*kp2) !ky=0
-      if ((kj/=0).and.(ki/=0)) coeff(i,j) = filt/(1+memi*tets*kp2) !ky/=0
+      coeff(i,j) = filt/(memi*tets*kp2)
     end do
   end do
 
@@ -163,18 +166,31 @@ subroutine load
 
   integer :: m
 
+  ! ions
   do m=1,ni
 !   load particle positions
-    x0(m)=lx*revers(myid*ni+m,2)
-    y0(m)=ly*(dble(myid*ni+m)-0.5)/dble(tni)
+    xi(m)=lx*revers(myid*ni+m,2)
+    yi(m)=ly*(dble(myid*ni+m)-0.5)/dble(tni)
 !   load maxwellian velocities
-    vx0(m)=dinvnorm(revers(myid*ni+m,3))
-    vy0(m)=dinvnorm(revers(myid*ni+m,5))
-    vz0(m)=dinvnorm(revers(myid*ni+m,7))
+    vxi(m)=dinvnorm(revers(myid*ni+m,3))
+    vyi(m)=dinvnorm(revers(myid*ni+m,5))
+    vzi(m)=dinvnorm(revers(myid*ni+m,7))
 !   initialize weights
-    w0(m)=amp*dsin(pi2*x0(m)/lx)*dsin(pi2*y0(m)/ly)
-    w1(m)=w0(m)
+    wi1(m)=amp*dsin(pi2*xi(m)/lx)*dsin(pi2*yi(m)/ly)
   end do
+
+  ! electrons
+  do m=1,ni
+!   load particle positions
+    xe1(m)=lx*revers(myid*ni+m,2)
+    ye1(m)=ly*(dble(myid*ni+m)-0.5)/dble(tni)
+!   load maxwellian velocities
+    vpe(m)=dinvnorm(revers(myid*ni+m,3))
+!   initialize weights
+    we1(m)=amp*dsin(pi2*xe(m)/lx)*dsin(pi2*ye(m)/ly)
+  end do
+
+  call update
 
 end
 
@@ -186,45 +202,69 @@ subroutine accumulate
 
   implicit none
   real(8) :: xpdx,ypdy,wx,wy
-  real(8) :: myden(0:nx,0:ny)
+  real(8) :: mydeni(0:nx,0:ny),mydene(0:nx,0:ny)
   integer :: i,j,m
 
-  denlast=den0
-  den0=0
-  myden=0
+  denlast=den
+  den=0
+  mydeni=0
+  mydene=0
 
+  ! ions
   do m=1,ni
-    xpdx=x0(m)/dx
-    ypdy=y0(m)/dy
+    xpdx=xi(m)/dx
+    ypdy=yi(m)/dy
     i=int(xpdx)
     j=int(ypdy)
     wx=dble(i+1)-xpdx
     wy=dble(j+1)-ypdy
-    myden(i,j)=myden(i,j)+w1(m)*wx*wy
-    myden(i+1,j)=myden(i+1,j)+w1(m)*(1.0-wx)*wy
-    myden(i,j+1)=myden(i,j+1)+w1(m)*wx*(1.0-wy)
-    myden(i+1,j+1)=myden(i+1,j+1)+w1(m)*(1.0-wx)*(1.0-wy)
+    mydeni(i,j)=mydeni(i,j)+wi1(m)*wx*wy
+    mydeni(i+1,j)=mydeni(i+1,j)+wi1(m)*(1.0-wx)*wy
+    mydeni(i,j+1)=mydeni(i,j+1)+wi1(m)*wx*(1.0-wy)
+    mydeni(i+1,j+1)=mydeni(i+1,j+1)+wi1(m)*(1.0-wx)*(1.0-wy)
   end do
 
-  call mpi_allreduce(myden,den0,(nx+1)*(ny+1),mpi_real8,mpi_sum,mpi_comm_world,ierr)
+  ! electrons
+  do m=1,ne
+    xpdx=xe1(m)/dx
+    ypdy=ye1(m)/dy
+    i=int(xpdx)
+    j=int(ypdy)
+    wx=dble(i+1)-xpdx
+    wy=dble(j+1)-ypdy
+    mydene(i,j)=mydene(i,j)+we1(m)*wx*wy
+    mydene(i+1,j)=mydene(i+1,j)+we1(m)*(1.0-wx)*wy
+    mydene(i,j+1)=mydene(i,j+1)+we1(m)*wx*(1.0-wy)
+    mydene(i+1,j+1)=mydene(i+1,j+1)+we1(m)*(1.0-wx)*(1.0-wy)
+  end do
+
+  call mpi_allreduce(mydeni,deni,(nx+1)*(ny+1),mpi_real8,mpi_sum,mpi_comm_world,ierr)
+  call mpi_allreduce(mydene,dene,(nx+1)*(ny+1),mpi_real8,mpi_sum,mpi_comm_world,ierr)
 
   !divide by particles per cell
-  den0=den0*dble(nx)*dble(ny)/dble(tni)
+  deni=deni*dble(nx)*dble(ny)/dble(tni)
+  dene=dene*dble(nx)*dble(ny)/dble(tne)
 
   do i=0,nx
-    den0(i,0)=den0(i,0)+den0(i,ny)
-    den0(i,ny)=den0(i,0)
+    deni(i,0)=deni(i,0)+deni(i,ny)
+    deni(i,ny)=deni(i,0)
+    dene(i,0)=dene(i,0)+dene(i,ny)
+    dene(i,ny)=dene(i,0)
   end do
 
   do j=0,ny
-    den0(0,j)=den0(0,j)+den0(nx,j)
-    den0(nx,j)=den0(0,j)
+    deni(0,j)=deni(0,j)+deni(nx,j)
+    deni(nx,j)=deni(0,j)
+    dene(0,j)=dene(0,j)+dene(nx,j)
+    dene(nx,j)=dene(0,j)
   end do
+
+  den = deni - dene
 
   if ((timestep.le.ninit).and.(initphi.eq.1)) then
     do i=0,nx
       do j=0,ny
-        den0(i,j)=amp*dsin(pi*i/nx)*dsin(pi2*j/ny)
+        den(i,j)=amp*dsin(pi2*i/nx)*dsin(pi2*j/ny)
       end do
     end do
   end if
@@ -244,7 +284,7 @@ subroutine field
   complex(8) :: ex(0:nx-1,0:ny-1),ey(0:nx-1,0:ny-1)
 
   !set potential equal to density and transform to k-space
-  phi = den0(0:nx-1,0:ny-1)
+  phi = den(0:nx-1,0:ny-1)
 
   do j=0,ny-1
     call ccfft('x',-1,nx,phi(:,j))
@@ -324,17 +364,17 @@ subroutine field
   end do
 
   !store final phi,e-field
-  phi0(0:nx-1,0:ny-1)=real(phi)
-  ex0(0:nx-1,0:ny-1)=real(ex)
-  ey0(0:nx-1,0:ny-1)=real(ey)
+  phi(0:nx-1,0:ny-1)=real(phi)
+  ex(0:nx-1,0:ny-1)=real(ex)
+  ey(0:nx-1,0:ny-1)=real(ey)
 
   !periodic boundaries
-  phi0(:,ny)=phi0(:,0)
-  phi0(nx,:)=phi0(0,:)
-  ex0(:,ny)=ex0(:,0)
-  ex0(nx,:)=ex0(0,:)
-  ey0(:,ny)=ey0(:,0)
-  ey0(nx,:)=ey0(0,:)
+  phi(:,ny)=phi(:,0)
+  phi(nx,:)=phi(0,:)
+  ex(:,ny)=ex(:,0)
+  ex(nx,:)=ex(0,:)
+  ey(:,ny)=ey(:,0)
+  ey(nx,:)=ey(0,:)
 
   return
 
@@ -353,8 +393,8 @@ subroutine residual
 
   do i=0,nx
     do j=0,ny
-      res = res + (den0(i,j)-denlast(i,j))**2
-      norm = norm + den0(i,j)**2
+      res = res + (den(i,j)-denlast(i,j))**2
+      norm = norm + den(i,j)**2
     end do
   end do
   res = (res/norm)**.5
@@ -375,47 +415,73 @@ subroutine epush
   real(8) :: xpdx,ypdy
   real(8) :: vxt,vyt !temp velocity storage
 
+  ! ions
   do m=1,ni
     ! interpolation weights
-    xpdx=x0(m)/dx
-    ypdy=y0(m)/dy
+    xpdx=xi(m)/dx
+    ypdy=yi(m)/dy
     i=int(xpdx)
     j=int(ypdy)
     wx=dble(i+1)-xpdx
     wy=dble(j+1)-ypdy
     ! interpolate e-field
-    ax=ex0(i,j)*wx*wy+ex0(i+1,j)*(1.0-wx)*wy+&
-      ex0(i,j+1)*wx*(1.0-wy)+ex0(i+1,j+1)*(1.0-wx)*(1.0-wy)
-    ay=ey0(i,j)*wx*wy+ey0(i+1,j)*(1.0-wx)*wy+&
-      ey0(i,j+1)*wx*(1.0-wy)+ey0(i+1,j+1)*(1.0-wx)*(1.0-wy)
+    ax=ex(i,j)*wx*wy+ex(i+1,j)*(1.0-wx)*wy+&
+      ex(i,j+1)*wx*(1.0-wy)+ex(i+1,j+1)*(1.0-wx)*(1.0-wy)
+    ay=ey(i,j)*wx*wy+ey(i+1,j)*(1.0-wx)*wy+&
+      ey(i,j+1)*wx*(1.0-wy)+ey(i+1,j+1)*(1.0-wx)*(1.0-wy)
     ! 1/2 velocity push
-    vx0(m)=vx0(m)+.5*dt*ax*enlin
-    vy0(m)=vy0(m)+.5*dt*ay*enlin
+    vxi(m)=vxi(m)+.5*dt*ax*enlin
+    vyi(m)=vyi(m)+.5*dt*ay*enlin
     ! full velocity rotation (theta,dt,-theta)
-    vxt=cdt*vx0(m)+sdt*cth*vy0(m)-sdt*sth*vz0(m)
-    vyt=-1.0*sdt*cth*vx0(m)+(cdt*cth**2+sth**2)*vy0(m)&
-      +(-1.0*cdt*sth*cth+sth*cth)*vz0(m)
-    vz0(m)=sdt*sth*vx0(m)+(-1.0*cdt*sth*cth+sth*cth)*vy0(m)&
-      +(cdt*sth**2+cth**2)*vz0(m)
-    vx0(m)=vxt
-    vy0(m)=vyt
+    vxt=cdt*vxi(m)+sdt*cth*vyi(m)-sdt*sth*vzi(m)
+    vyt=-1.0*sdt*cth*vxi(m)+(cdt*cth**2+sth**2)*vyi(m)&
+      +(-1.0*cdt*sth*cth+sth*cth)*vzi(m)
+    vzi(m)=sdt*sth*vxi(m)+(-1.0*cdt*sth*cth+sth*cth)*vyi(m)&
+      +(cdt*sth**2+cth**2)*vzi(m)
+    vxi(m)=vxt
+    vyi(m)=vyt
     ! 1/2 velocity push
-    vx0(m)=vx0(m)+.5*dt*ax*enlin
-    vy0(m)=vy0(m)+.5*dt*ay*enlin
+    vxi(m)=vxi(m)+.5*dt*ax*enlin
+    vyi(m)=vyi(m)+.5*dt*ay*enlin
     ! weight equation terms
-    vdv=vx0(m)**2+vy0(m)**2+vz0(m)**2
-    edv=vx0(m)*ax+vy0(m)*ay
+    vdv=vxi(m)**2+vyi(m)**2+vzi(m)**2
+    edv=vxi(m)*ax+vyi(m)*ay
     kap=kapn+kapt*(.5*vdv-1.5)
     ! explicit 1/2 weight advance
-    w0(m)=w0(m)+.5*dt*(1-w0(m)*wnlin)*(edv+cth*ay*kap)
+    wi0(m)=wi0(m)+.5*dt*(1-wi0(m)*wnlin)*(edv+cth*ay*kap)
     ! full position advance
-    x0(m)=x0(m)+dt*vx0(m)
-    y0(m)=y0(m)+dt*vy0(m)
+    xi(m)=xi(m)+dt*vxi(m)
+    yi(m)=yi(m)+dt*vyi(m)
     ! periodic boundaries
-    x0(m)=x0(m)-lx*dble(floor(x0(m)/lx))
-    y0(m)=y0(m)-ly*dble(floor(y0(m)/ly))
+    xi(m)=xi(m)-lx*dble(floor(xi(m)/lx))
+    yi(m)=yi(m)-ly*dble(floor(yi(m)/ly))
   end do
 
+  ! electrons
+  do m=1,ne
+    ! interpolation weights
+    xpdx=xe(m)/dx
+    ypdy=ye(m)/dy
+    i=int(xpdx)
+    j=int(ypdy)
+    wx=dble(i+1)-xpdx
+    wy=dble(j+1)-ypdy
+    ! interpolate e-field
+    ax=ex(i,j)*wx*wy+ex(i+1,j)*(1.0-wx)*wy+&
+      ex(i,j+1)*wx*(1.0-wy)+ex(i+1,j+1)*(1.0-wx)*(1.0-wy)
+    ay=ey(i,j)*wx*wy+ey(i+1,j)*(1.0-wx)*wy+&
+      ey(i,j+1)*wx*(1.0-wy)+ey(i+1,j+1)*(1.0-wx)*(1.0-wy)
+    ! full parallel velocity push
+    vpe(m)=vpe(m)-dt*ay*sth*enlin
+    ! explicit part of weight advance
+    we0(m)=we0(m)-.5*dt*(1-we0(m)*wnlin)*(sth*ay*vpe(m))
+    ! explicit part of position advance
+    xe0=xe0+.5*dt*ay*cth
+    ye0=ye0-.5*dt*ax*cth+dt*sth*vpe(m)
+    ! periodic boundaries
+    xe0(m)=xe0(m)-lx*dble(floor(xe0(m)/lx))
+    ye0(m)=ye0(m)-ly*dble(floor(ye0(m)/ly))
+  end do
 
 end
 
@@ -430,28 +496,66 @@ subroutine ipush
   real(8) :: wx,wy
   real(8) :: xpdx,ypdy
 
+  ! ions
   do m=1,ni
-    xpdx=x0(m)/dx
-    ypdy=y0(m)/dy
+    xpdx=xi(m)/dx
+    ypdy=yi(m)/dy
     i=int(xpdx)
     j=int(ypdy)
     wx=dble(i+1)-xpdx
     wy=dble(j+1)-ypdy
     ! interpolate e-field
-    ax=ex0(i,j)*wx*wy+ex0(i+1,j)*(1.0-wx)*wy+&
-      ex0(i,j+1)*wx*(1.0-wy)+ex0(i+1,j+1)*(1.0-wx)*(1.0-wy)
-    ay=ey0(i,j)*wx*wy+ey0(i+1,j)*(1.0-wx)*wy+&
-      ey0(i,j+1)*wx*(1.0-wy)+ey0(i+1,j+1)*(1.0-wx)*(1.0-wy)
+    ax=ex(i,j)*wx*wy+ex(i+1,j)*(1.0-wx)*wy+&
+      ex(i,j+1)*wx*(1.0-wy)+ex(i+1,j+1)*(1.0-wx)*(1.0-wy)
+    ay=ey(i,j)*wx*wy+ey(i+1,j)*(1.0-wx)*wy+&
+      ey(i,j+1)*wx*(1.0-wy)+ey(i+1,j+1)*(1.0-wx)*(1.0-wy)
     ! weight equation terms
-    vdv=vx0(m)**2+vy0(m)**2+vz0(m)**2
-    edv=vx0(m)*ax+vy0(m)*ay
+    vdv=vxi(m)**2+vyi(m)**2+vzi(m)**2
+    edv=vxi(m)*ax+vyi(m)*ay
     kap=kapn+kapt*(.5*vdv-1.5)
     ! implicit weight advance
-    w1(m)=w0(m)+.5*dt*(1-w1(m)*wnlin)*(edv+cth*ay*kap)
+    wi1(m)=wi0(m)+.5*dt*(1-wi1(m)*wnlin)*(edv+cth*ay*kap)
+  end do
+
+  ! electrons
+  do m=1,ne
+    ! interpolation weights
+    xpdx=xe(m)/dx
+    ypdy=ye(m)/dy
+    i=int(xpdx)
+    j=int(ypdy)
+    wx=dble(i+1)-xpdx
+    wy=dble(j+1)-ypdy
+    ! interpolate e-field
+    ax=ex(i,j)*wx*wy+ex(i+1,j)*(1.0-wx)*wy+&
+      ex(i,j+1)*wx*(1.0-wy)+ex(i+1,j+1)*(1.0-wx)*(1.0-wy)
+    ay=ey(i,j)*wx*wy+ey(i+1,j)*(1.0-wx)*wy+&
+      ey(i,j+1)*wx*(1.0-wy)+ey(i+1,j+1)*(1.0-wx)*(1.0-wy)
+    ! implicit part of weight advance
+    we1(m)=we0(m)-.5*dt*(1-we1(m)*wnlin)*(sth*ay*vpe(m))
+    ! implicit part of position advance
+    xe1=xe0+.5*dt*ay*cth
+    ye1=ye0-.5*dt*ax*cth
+    ! periodic boundaries
+    xe1(m)=xe1(m)-lx*dble(floor(xe1(m)/lx))
+    ye1(m)=ye1(m)-ly*dble(floor(ye1(m)/ly))
   end do
 
 end
 
+!-----------------------------------------------------------------------
+
+subroutine update
+
+  wi0 = wi1
+  xe0 = xe1
+  ye0 = ye1
+  we0 = we1
+
+end
+
+!-----------------------------------------------------------------------
+!-----------------------------------------------------------------------
 !-----------------------------------------------------------------------
 
 subroutine temperature
@@ -467,16 +571,16 @@ subroutine temperature
   tempxy=0
 
   do m=1,ni
-    xpdx=x0(m)/dx
-    ypdy=y0(m)/dy
+    xpdx=xi(m)/dx
+    ypdy=yi(m)/dy
     i=int(xpdx)
     j=int(ypdy)
     wx=dble(i+1)-xpdx
     wy=dble(j+1)-ypdy
-    mytempxy(i,j)=mytempxy(i,j)+w1(m)*wx*wy*(vx0(m)**2+(cth*vy0(m)-sth*vz0(m))**2)
-    mytempxy(i+1,j)=mytempxy(i+1,j)+w1(m)*(1.0-wx)*wy*(vx0(m)**2+(cth*vy0(m)-sth*vz0(m))**2)
-    mytempxy(i,j+1)=mytempxy(i,j+1)+w1(m)*wx*(1.0-wy)*(vx0(m)**2+(cth*vy0(m)-sth*vz0(m))**2)
-    mytempxy(i+1,j+1)=mytempxy(i+1,j+1)+w1(m)*(1.0-wx)*(1.0-wy)*(vx0(m)**2+(cth*vy0(m)-sth*vz0(m))**2)
+    mytempxy(i,j)=mytempxy(i,j)+wi1(m)*wx*wy*(vxi(m)**2+(cth*vyi(m)-sth*vzi(m))**2)
+    mytempxy(i+1,j)=mytempxy(i+1,j)+wi1(m)*(1.0-wx)*wy*(vxi(m)**2+(cth*vyi(m)-sth*vzi(m))**2)
+    mytempxy(i,j+1)=mytempxy(i,j+1)+wi1(m)*wx*(1.0-wy)*(vxi(m)**2+(cth*vyi(m)-sth*vzi(m))**2)
+    mytempxy(i+1,j+1)=mytempxy(i+1,j+1)+wi1(m)*(1.0-wx)*(1.0-wy)*(vxi(m)**2+(cth*vyi(m)-sth*vzi(m))**2)
   end do
  
   call mpi_allreduce(mytempxy,tempxy,(nx+1)*(ny+1),mpi_real8,mpi_sum,mpi_comm_world,ierr)
@@ -590,9 +694,9 @@ subroutine diagnostics
   myw2sum=0
   do m=1,ni
     !net heat flux in x-direction
-    myqx = myqx + w1(m)*vx0(m)*(vx0(m)**2+vy0(m)**2+vz0(m)**2)
+    myqx = myqx + wi1(m)*vxi(m)*(vxi(m)**2+vyi(m)**2+vzi(m)**2)
     !weight squared sum
-    myw2sum = myw2sum + w1(m)**2
+    myw2sum = myw2sum + wi1(m)**2
   end do
 
   call mpi_allreduce(myqx,qx,1,mpi_real8,mpi_sum,mpi_comm_world,ierr)
@@ -633,17 +737,17 @@ subroutine zdiagnostics
   mypy=0
 
   do m=1,ni
-    xpdx=x0(m)/dx
+    xpdx=xi(m)/dx
     i=int(xpdx)
     wx=dble(i+1)-xpdx
-    myuy(i)=myuy(i)+w1(m)*wx*vy0(m)
-    myuy(i+1)=myuy(i+1)+w1(m)*(1.0-wx)*vy0(m)
-    myuz(i)=myuz(i)+w1(m)*wx*vz0(m)
-    myuz(i+1)=myuz(i+1)+w1(m)*(1.0-wx)*vz0(m)
-    mypx(i)=mypx(i)+w1(m)*wx*vx0(m)**2
-    mypx(i+1)=mypx(i+1)+w1(m)*(1.0-wx)*vx0(m)**2
-    mypy(i)=mypy(i)+w1(m)*wx*(cth*vy0(m)-sth*vz0(m))**2
-    mypy(i+1)=mypy(i+1)+w1(m)*(1.0-wx)*(cth*vy0(m)-sth*vz0(m))**2
+    myuy(i)=myuy(i)+wi1(m)*wx*vyi(m)
+    myuy(i+1)=myuy(i+1)+wi1(m)*(1.0-wx)*vyi(m)
+    myuz(i)=myuz(i)+wi1(m)*wx*vzi(m)
+    myuz(i+1)=myuz(i+1)+wi1(m)*(1.0-wx)*vzi(m)
+    mypx(i)=mypx(i)+wi1(m)*wx*vxi(m)**2
+    mypx(i+1)=mypx(i+1)+wi1(m)*(1.0-wx)*vxi(m)**2
+    mypy(i)=mypy(i)+wi1(m)*wx*(cth*vyi(m)-sth*vzi(m))**2
+    mypy(i+1)=mypy(i+1)+wi1(m)*(1.0-wx)*(cth*vyi(m)-sth*vzi(m))**2
   enddo
 
   call mpi_allreduce(myuy,uy,nx+1,mpi_real8,mpi_sum,mpi_comm_world,ierr)

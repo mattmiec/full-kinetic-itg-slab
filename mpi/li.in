@@ -2,14 +2,17 @@
 '* input file for 2D lorentz ion code                                 *'
 '**********************************************************************'
                                                                        
+'  ni          ne                                                      '
+   262144      262144
+
 '  nx          ny          nt          tol                             '
    64          64          100000      1d-4 
                                                                       
 '  lx          ly          dt          theta                           '
    62.83       15.71       0.1         0.01
                                                                  
-'  ni          amp         initphi     ninit                           '
-   67108864    1d-3        0           50
+'  amp         initphi     ninit                                       '
+   1d-3        0           50
                                                                       
 '  kappan      kappat      tets        memi                            '
    0.0         0.05        1.0         0.01
