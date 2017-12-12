@@ -168,6 +168,9 @@ subroutine load
   implicit none
   integer :: m
 
+  wi1 = 0.
+  we1 = 0.
+
   ! ions
   do m=1,ni
 !   load particle positions
@@ -178,7 +181,7 @@ subroutine load
     vyi(m)=dinvnorm(revers(myid*ni+m,5))
     vzi(m)=dinvnorm(revers(myid*ni+m,7))
 !   initialize weights
-    wi1(m)=amp*dsin(pi2*xi(m)/lx)*dsin(pi2*yi(m)/ly)
+    if (initphi /= 0) wi1(m)=amp*dsin(pi2*xi(m)/lx)*dsin(pi2*yi(m)/ly)
   end do
 
   ! electrons
@@ -189,7 +192,7 @@ subroutine load
 !   load maxwellian velocities
     vpe(m)=dinvnorm(revers(myid*ne+m,3))/sqrt(memi)
 !   initialize weights
-    we1(m)=amp*dsin(pi2*xe1(m)/lx)*dsin(pi2*ye1(m)/ly)
+    if (initphi /= 0) we1(m)=amp*dsin(pi2*xe1(m)/lx)*dsin(pi2*ye1(m)/ly)
   end do
 
 end
@@ -473,8 +476,11 @@ subroutine epush
       ey(i,j+1)*wx*(1.0-wy)+ey(i+1,j+1)*(1.0-wx)*(1.0-wy)
     ! full parallel velocity push
     vpe(m)=vpe(m)-dt*ay*sth*enlin/memi
-    ! explicit part of weight advance
-    we0(m)=we0(m)-.5*dt*(1-we0(m)*wnlin)*(sth*ay*vpe(m))
+    ! weight equation terms
+    vdv=vpe(m)**2
+    kap=kapn+kapt*(.5*memi*vdv-1.5)
+    ! explicit 1/2 weight advance
+    we0(m)=we0(m)-.5*dt*(1-we0(m)*wnlin)*(sth*ay*vpe(m)+ay*kap)
     ! explicit part of position advance
     xe0(m)=xe0(m)+.5*dt*ay*cth
     ye0(m)=ye0(m)-.5*dt*ax*cth+dt*sth*vpe(m)
@@ -531,8 +537,11 @@ subroutine ipush
       ex(i,j+1)*wx*(1.0-wy)+ex(i+1,j+1)*(1.0-wx)*(1.0-wy)
     ay=ey(i,j)*wx*wy+ey(i+1,j)*(1.0-wx)*wy+&
       ey(i,j+1)*wx*(1.0-wy)+ey(i+1,j+1)*(1.0-wx)*(1.0-wy)
+    ! weight equation terms
+    vdv=vpe(m)**2
+    kap=kapn+kapt*(.5*memi*vdv-1.5)
     ! implicit part of weight advance
-    we1(m)=we0(m)-.5*dt*(1-we1(m)*wnlin)*(sth*ay*vpe(m))
+    we1(m)=we0(m)-.5*dt*(1-we1(m)*wnlin)*(sth*ay*vpe(m)+ay*kap)
     ! implicit part of position advance
     xe1(m)=xe0(m)+.5*dt*ay*cth
     ye1(m)=ye0(m)-.5*dt*ax*cth
