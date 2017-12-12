@@ -268,14 +268,6 @@ subroutine accumulate
 
   den = deni - dene
 
-  if ((timestep.le.ninit).and.(initphi.eq.1)) then
-    do i=0,nx
-      do j=0,ny
-        den(i,j)=amp*dsin(pi2*i/nx)*dsin(pi2*j/ny)
-      end do
-    end do
-  end if
-
 end
 
 !-----------------------------------------------------------------------
@@ -325,6 +317,15 @@ subroutine field
       phit(i,j) = coeff(i,j)*phit(i,j)
     end do
   end do
+
+  !initialize if initphi
+  if ((timestep.le.ninit).and.(initphi.eq.1)) then
+      phit = 0.
+      phit(1,1)=amp
+      phit(nx-1,1)=-amp
+      phit(1,ny-1)=-amp
+      phit(nx-1,ny-1)=amp
+  end if
 
   !record selected modes
   do i=1,nmode
