@@ -155,6 +155,10 @@ subroutine initialize
       kp2 = kx*kx + ky*ky
       filt = exp(-1*(xshape**2*kx**2+yshape**2*ky**2)**2)
       coeff(i,j) = filt/(memi*tets*kp2)
+      ! zonal flow excluded if zflow != 1
+      if ((zflow /= 1) .and. kj==0) coeff(i,j)=0.
+      ! isolate 1,1 and 2,0 if isolate == 1
+      if ((isolate == 1) .and. (.not.((ki == 1).and.(kj == 1) .or. (ki == 2).and.(kj == 0)))) coeff(i,j)=0.
     end do
   end do
 
@@ -326,19 +330,6 @@ subroutine field
   do i=1,nmode
     phihist(i) = phit(modeindices(1,i),modeindices(2,i))
   end do
-
-  !(optional) remove all modes except (1,1)=-(-1,1) and (2,0)
-  if (isolate==1) then
-    do i=0,nx-1
-      do j=0,ny-1
-        ki = min(i,nx-i)
-        kj = min(j,ny-j)
-        if (((ki/=1).or.(kj/=1)).and.((ki/=2).or.(kj/=0))) then
-          phit(i,j)=0
-        end if
-      end do
-    end do
-  end if
 
   !calculate e-field
   do i=0,nx-1
