@@ -185,7 +185,7 @@ subroutine load
     vyi(m)=dinvnorm(revers(myid*ni+m,5))
     vzi(m)=dinvnorm(revers(myid*ni+m,7))
 !   initialize weights
-    if (initphi /= 0) wi1(m)=amp*dsin(pi2*xi(m)/lx)*dsin(pi2*yi(m)/ly)
+    if (initphi /= 1) wi1(m)=amp*dsin(pi2*xi(m)/lx)*dsin(pi2*yi(m)/ly)
   end do
 
   ! electrons
@@ -196,7 +196,7 @@ subroutine load
 !   load maxwellian velocities
     vpe(m)=dinvnorm(revers(myid*ne+m,3))/sqrt(memi)
 !   initialize weights
-    if (initphi /= 0) we1(m)=amp*dsin(pi2*xe1(m)/lx)*dsin(pi2*ye1(m)/ly)
+    if (initphi /= 1) we1(m)=amp*dsin(pi2*xe1(m)/lx)*dsin(pi2*ye1(m)/ly)
   end do
 
 end
