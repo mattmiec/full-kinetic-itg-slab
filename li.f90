@@ -472,7 +472,7 @@ subroutine epush
     vdv=vpe(m)**2
     kap=kapn+kapt*(.5*memi*vdv-1.5)
     ! explicit 1/2 weight advance
-    we0(m)=we0(m)-.5*dt*(1-we0(m)*wnlin)*(sth*ay*vpe(m)+ay*kap)
+    we0(m)=we0(m)-.5*dt*(1-we0(m)*wnlin)*(sth*ay*vpe(m)-cth*ay*kap)
     ! explicit part of position advance
     xe0(m)=xe0(m)+.5*dt*ay*cth
     ye0(m)=ye0(m)-.5*dt*ax*cth+dt*sth*vpe(m)
@@ -533,7 +533,7 @@ subroutine ipush
     vdv=vpe(m)**2
     kap=kapn+kapt*(.5*memi*vdv-1.5)
     ! implicit part of weight advance
-    we1(m)=we0(m)-.5*dt*(1-we1(m)*wnlin)*(sth*ay*vpe(m)+ay*kap)
+    we1(m)=we0(m)-.5*dt*(1-we1(m)*wnlin)*(sth*ay*vpe(m)-cth*ay*kap)
     ! implicit part of position advance
     xe1(m)=xe0(m)+.5*dt*ay*cth
     ye1(m)=ye0(m)-.5*dt*ax*cth
