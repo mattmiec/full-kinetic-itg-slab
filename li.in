@@ -3,22 +3,25 @@
 '**********************************************************************'
                                                                        
 '  ni          ne                                                      '
-   262144      262144
+   65536       65536  
 
 '  nx          ny          nt          tol                             '
-   64          64          100000      1d-4 
+   32          32          50000       1d-4 
                                                                       
 '  lx          ly          dt          theta                           '
-   62.83       15.71       0.1         0.01
+   62.83       15.71       0.2         0.01
                                                                  
 '  amp         initphi     ninit                                       '
    1d-3        0           50
                                                                       
-'  kappan      kappat      tets        memi                            '
-   0.0         0.05        1.0         0.01
+'  kappani     kappati     kappane     kappate                         '
+   0.0         0.05        0.0         0.0   
+
+'  teti        memif       memip                                       '
+   1.0         0.01        0.0005
 
 '  bounded     enlin       wnlin       odd                             '
-   1           1           0           1
+   1           1           1           1
 
 '  isolate     zflow       xshape      yshape                          '
    1           1           0.0         0.0

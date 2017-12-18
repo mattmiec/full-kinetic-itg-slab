@@ -109,7 +109,9 @@ subroutine initialize
       read(115,*) dumchar
       read(115,*) amp,initphi,ninit
       read(115,*) dumchar
-      read(115,*) kapn,kapt,tets,memi
+      read(115,*) kapni,kapti,kapne,kapte
+      read(115,*) dumchar
+      read(115,*) teti,memif,memip
       read(115,*) dumchar
       read(115,*) bounded,enlin,wnlin,odd
       read(115,*) dumchar
@@ -154,11 +156,15 @@ subroutine initialize
       ky = 2*pi*kj/ly
       kp2 = kx*kx + ky*ky
       filt = exp(-1*(xshape**2*kx**2+yshape**2*ky**2)**2)
-      coeff(i,j) = filt/(memi*tets*kp2)
+      coeff(i,j) = filt/(memif*teti*kp2)
       ! zonal flow excluded if zflow != 1
       if ((zflow /= 1) .and. kj==0) coeff(i,j)=0.
       ! isolate 1,1 and 2,0 if isolate == 1
-      if ((isolate == 1) .and. (.not.((ki == 1).and.(kj == 1) .or. (ki == 2).and.(kj == 0)))) coeff(i,j)=0.
+      if ((isolate == 1) .and. (.not.(((ki == 1).and.(kj == 1)) .or. ((ki == 2).and.(kj == 0))))) coeff(i,j)=0.
+      if (myid==0) then
+        print*,'i = ',i,', j = ',j
+        print*,'coeff =',coeff(i,j)
+      end if
     end do
   end do
 
@@ -194,7 +200,7 @@ subroutine load
     xe1(m)=lx*revers(myid*ne+m,2)
     ye1(m)=ly*(dble(myid*ne+m)-0.5)/dble(tne)
 !   load maxwellian velocities
-    vpe(m)=dinvnorm(revers(myid*ne+m,3))/sqrt(memi)
+    vpe(m)=dinvnorm(revers(myid*ne+m,3))/sqrt(memip)
 !   initialize weights
     if (initphi /= 1) we1(m)=amp*dsin(pi2*xe1(m)/lx)*dsin(pi2*ye1(m)/ly)
   end do
@@ -339,8 +345,8 @@ subroutine field
       if (i>nx/2) kx = -2*pi*(nx-i)/lx
       if (j<=ny/2) ky = 2*pi*j/ly
       if (j>ny/2) ky = -2*pi*(ny-j)/ly
-      ext(i,j) = -IU*kx*tets*phit(i,j)
-      eyt(i,j) = -IU*ky*tets*phit(i,j)
+      ext(i,j) = -IU*kx*teti*phit(i,j)
+      eyt(i,j) = -IU*ky*teti*phit(i,j)
     end do
   end do
 
@@ -441,7 +447,7 @@ subroutine epush
     ! weight equation terms
     vdv=vxi(m)**2+vyi(m)**2+vzi(m)**2
     edv=vxi(m)*ax+vyi(m)*ay
-    kap=kapn+kapt*(.5*vdv-1.5)
+    kap=kapni+kapti*(.5*vdv-1.5)
     ! explicit 1/2 weight advance
     wi0(m)=wi0(m)+.5*dt*(1-wi0(m)*wnlin)*(edv+cth*ay*kap)
     ! full position advance
@@ -467,10 +473,10 @@ subroutine epush
     ay=ey(i,j)*wx*wy+ey(i+1,j)*(1.0-wx)*wy+&
       ey(i,j+1)*wx*(1.0-wy)+ey(i+1,j+1)*(1.0-wx)*(1.0-wy)
     ! full parallel velocity push
-    vpe(m)=vpe(m)-dt*ay*sth*enlin/memi
+    vpe(m)=vpe(m)-dt*ay*sth*enlin/memip
     ! weight equation terms
     vdv=vpe(m)**2
-    kap=kapn+kapt*(.5*memi*vdv-1.5)
+    kap=kapne+kapte*(.5*memip*vdv-1.5)
     ! explicit 1/2 weight advance
     we0(m)=we0(m)-.5*dt*(1-we0(m)*wnlin)*(sth*ay*vpe(m)-cth*ay*kap)
     ! explicit part of position advance
@@ -510,7 +516,7 @@ subroutine ipush
     ! weight equation terms
     vdv=vxi(m)**2+vyi(m)**2+vzi(m)**2
     edv=vxi(m)*ax+vyi(m)*ay
-    kap=kapn+kapt*(.5*vdv-1.5)
+    kap=kapni+kapti*(.5*vdv-1.5)
     ! implicit weight advance
     wi1(m)=wi0(m)+.5*dt*(1-wi1(m)*wnlin)*(edv+cth*ay*kap)
   end do
@@ -531,7 +537,7 @@ subroutine ipush
       ey(i,j+1)*wx*(1.0-wy)+ey(i+1,j+1)*(1.0-wx)*(1.0-wy)
     ! weight equation terms
     vdv=vpe(m)**2
-    kap=kapn+kapt*(.5*memi*vdv-1.5)
+    kap=kapne+kapte*(.5*memip*vdv-1.5)
     ! implicit part of weight advance
     we1(m)=we0(m)-.5*dt*(1-we1(m)*wnlin)*(sth*ay*vpe(m)-cth*ay*kap)
     ! implicit part of position advance
