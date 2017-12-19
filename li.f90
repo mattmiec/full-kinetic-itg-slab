@@ -52,7 +52,7 @@ program li
     call modeout(phihist,'phist',11)
     call modeout(denhist,'dhist',12)
     call modeout(temphist,'thist',13)
-    !call diagnostics
+    call diagnostics
     !call zdiagnostics
     if (mod(timestep,nrec).eq.0) then
       call gridout(phi,'phixy',14)
@@ -691,35 +691,53 @@ subroutine diagnostics
 
   implicit none
   integer :: id,m,i,j
-  real(8) ::xpdx,ypdy,wx,wy,qx,myqx,w2sum,myw2sum
+  real(8) ::xpdx,ypdy,wx,wy,qx,myqx,w2i,myw2i,w2e,myw2e,mykei,kei,mykee,kee
   character*5 :: fl
   character*70 :: flnm
 
   id=89
 
   qx=0
+  w2i=0
+  w2e=0
+  kei=0
+  kee=0
+
   myqx=0
-  w2sum=0
-  myw2sum=0
+  myw2i=0
+  myw2e=0
+  mykei=0
+  mykee=0
   do m=1,ni
-    !net heat flux in x-direction
+    !net ion heat flux in x-direction
     myqx = myqx + wi1(m)*vxi(m)*(vxi(m)**2+vyi(m)**2+vzi(m)**2)
     !weight squared sum
-    myw2sum = myw2sum + wi1(m)**2
+    myw2i = myw2i + wi1(m)**2
+    myw2e = myw2e + we1(m)**2
+    !kinetic energies
+    mykei = mykei + 0.5*wi1(m)*(vxi(m)**2+vyi(m)**2+vzi(m)**2)
+    mykee = mykee + 0.5*we1(m)*memip*vpe(m)**2
   end do
 
   call mpi_allreduce(myqx,qx,1,mpi_real8,mpi_sum,mpi_comm_world,ierr)
-  call mpi_allreduce(myw2sum,w2sum,1,mpi_real8,mpi_sum,mpi_comm_world,ierr)
+  call mpi_allreduce(myw2i,w2i,1,mpi_real8,mpi_sum,mpi_comm_world,ierr)
+  call mpi_allreduce(myw2e,w2e,1,mpi_real8,mpi_sum,mpi_comm_world,ierr)
+  call mpi_allreduce(mykei,kei,1,mpi_real8,mpi_sum,mpi_comm_world,ierr)
+  call mpi_allreduce(mykee,kee,1,mpi_real8,mpi_sum,mpi_comm_world,ierr)
 
   qx=qx/dble(tni)
-  w2sum=w2sum/dble(tni)
+  w2i=w2i/dble(tni)
+  w2e=w2e/dble(tne)
+  kei=kei/dble(tni)
+  kee=kee/dble(tne)
 
   if (myid==0) then
     flnm='diagn.out'
     open(id,file=flnm,form='formatted',status='unknown',&
       position='append')
+    if (timestep==1) write(id) 't  qx  w2i  w2e  kei  kee'
     write(id,'(f8.2)',advance="no") dt*timestep
-    write(id,'(a2,e13.6,a2,e13.6)') '  ',qx,'  ',w2sum
+    write(id,'(a2,e13.6,a2,e13.6,a2,e13.6,a2,e13.6,a2,e13.6)') '  ',qx,'  ',w2i,'  ',w2e,'  ',kei,'  ',kee
     endfile id
     close(id)
   endif
