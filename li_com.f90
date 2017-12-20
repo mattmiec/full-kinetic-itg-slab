@@ -9,7 +9,8 @@ module li_com
   integer :: ni,ne,initphi,ninit
   real(8) :: kapni,kapti,kapne,kapte
   real(8) :: teti,memif,memip
-  integer :: bounded,enlin,wnlin,isolate,zflow,odd
+  integer :: eperpi,epari,weighti,eperpe,epare,weighte
+  integer :: bounded,isolate,zflow,odd
   real(8) :: xshape,yshape
   integer :: nrec,nprint,nmode
   integer,dimension(:,:),allocatable :: modeindices

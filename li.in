@@ -2,30 +2,39 @@
 '* input file for 2D lorentz ion code                                 *'
 '**********************************************************************'
                                                                        
-'  ni          ne                                                      '
-   65536       65536  
+'--particles, timestepping, geometry-----------------------------------'
 
-'  nx          ny          nt          tol                             '
-   32          32          50000       1d-4 
+'  ni          ne          nt          dt          tol                 '
+   65536       65536       50000       0.2         1d-4
                                                                       
-'  lx          ly          dt          theta                           '
-   62.83       15.71       0.2         0.01
+'  nx          ny          lx          ly          theta               '
+   32          32          62.83       15.71       0.01
                                                                  
+'--initialization------------------------------------------------------'
+
 '  amp         initphi     ninit                                       '
    1d-3        0           50
                                                                       
+'--physical parameters-------------------------------------------------'
+
 '  kappani     kappati     kappane     kappate                         '
    0.0         0.05        0.0         0.0   
 
 '  teti        memif       memip                                       '
    1.0         0.01        0.0005
 
-'  bounded     enlin       wnlin       odd                             '
-   1           1           1           1
+'--nonlinearities------------------------------------------------------'
 
-'  isolate     zflow       xshape      yshape                          '
-   1           1           0.0         0.0
+'  eperpi      epari       weighti     eperpe      epare       weighte
+   1           0           0           0           0           0
+
+'--mode structure------------------------------------------------------'
+
+'  bounded     isolate     zflow       odd         xshape      yshape  '
+   1           1           1           1           0.0         0.0
                                                                        
+'--output--------------------------------------------------------------'
+
 '  nrec        nprint      nmode                                       '
    100         100         2
 
@@ -37,11 +46,15 @@
 '  explanation of variables:                                           '
 '----------------------------------------------------------------------'
 '                                                                      '
-' length in rho_s, time in inverse omega_ci, velocity in c_s           '
+' length in rho_i, time in inverse omega_ci, velocity in v_ti          '
 '                                                                      '
 ' nx,ny are no. of grid cells in x,y; nt is no. of time steps          '
 '                                                                      '
-' lx,ly: x,y lengths of the system in rho_s; dt: omega_ci delta t      '
+' lx,ly: x,y lengths of the system in rho_i; dt: omega_ci delta t      '
+'                                                                      '
+' tol sets convergence test for picard iteration                       '
+'                                                                      '
+' theta: \vec{B} = B_0 (\hat{z} cos theta + \hat{y} sin theta)         '
 '                                                                      '
 ' amp: initial perturbation size                                       '
 '                                                                      '
@@ -51,21 +64,20 @@
 '                                                                      '
 ' nrec is the number of timesteps between recording mode amplitudes    '
 '                                                                      '
-' ni is the no. of ions                                                '
+' ni is the no. of ions, ne is no. of electrons                        '
 '                                                                      '
 ' tets is (q_s T_e)/(e T_s)                                            '
 '                                                                      '
-' kappan = -(grad n_s)/n_s, kappat = -(grad T_s)/T_s                   '
+' kappan(s) = -(grad n_s)/n_s, kappat(s) = -(grad T_s)/T_s             '
 '                                                                      '
-' mems is (e m_s)/(q_s m_e)                                            '
+' memi is (q_i m_e)/(e m_i)                                            '
 '                                                                      '
-' set enlin,wnlin to 1 for nonlinear e-field terms, factor (1-w)       '
-'                                                                      '
-' threads sets the number of openmp threads                            '
+' eperpi, epari, weighti, eperpe, epare, weighte are switches          '
+' set to 1 to turn on nonlinearity, 0 to turn off                      '
 '                                                                      '
 ' set isolate=1 to isolate (1,1), (1,-1), and (2,0)                    '
 '                                                                      '
-' set nozflow==1 to zero out (i,0) modes                               '
+' zflow=1 turns on ky=0 modes                                          '
 '                                                                      '
 ' xshape,yshape set filtering                                          '
 '                                                                      '

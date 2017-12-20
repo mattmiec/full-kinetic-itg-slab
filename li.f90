@@ -101,21 +101,25 @@ subroutine initialize
       read(115,*) dumchar
       read(115,*) dumchar
       read(115,*) dumchar
-      read(115,*) ni,ne
       read(115,*) dumchar
-      read(115,*) nx,ny,nt,tol
+      read(115,*) ni,ne,nt,dt,tol
       read(115,*) dumchar
-      read(115,*) lx,ly,dt,theta
+      read(115,*) nx,ny,lx,ly,theta
+      read(115,*) dumchar
       read(115,*) dumchar
       read(115,*) amp,initphi,ninit
+      read(115,*) dumchar
       read(115,*) dumchar
       read(115,*) kapni,kapti,kapne,kapte
       read(115,*) dumchar
       read(115,*) teti,memif,memip
       read(115,*) dumchar
-      read(115,*) bounded,enlin,wnlin,odd
       read(115,*) dumchar
-      read(115,*) isolate,zflow,xshape,yshape
+      read(115,*) eperpi,epari,weighti,eperpe,epare,weighte
+      read(115,*) dumchar
+      read(115,*) dumchar
+      read(115,*) bounded,isolate,zflow,odd,xshape,yshape
+      read(115,*) dumchar
       read(115,*) dumchar
       read(115,*) nrec,nprint,nmode
       tni=ni*nproc !total ions
