@@ -165,10 +165,12 @@ subroutine initialize
       if ((zflow /= 1) .and. kj==0) coeff(i,j)=0.
       ! isolate 1,1 and 2,0 if isolate == 1
       if ((isolate == 1) .and. (.not.(((ki == 1).and.(kj == 1)) .or. ((ki == 2).and.(kj == 0))))) coeff(i,j)=0.
-      !if (myid==0) then
-      !  print*,'i = ',i,', j = ',j
-      !  print*,'coeff =',coeff(i,j)
-      !end if
+      ! remove odd kx modes for ky=0
+      if ((odd /= 1) .and. (kj == 0) .and. (mod(ki,2) == 1)) coeff(i,j) = 0
+      if (myid==0) then
+        print*,'i = ',i,', j = ',j
+        print*,'coeff =',coeff(i,j)
+      end if
     end do
   end do
 
