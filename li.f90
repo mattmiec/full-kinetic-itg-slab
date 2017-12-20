@@ -746,7 +746,7 @@ subroutine diagnostics
     flnm='diagn.out'
     open(id,file=flnm,form='formatted',status='unknown',&
       position='append')
-    if (timestep==1) write(id) 't  qx  w2i  w2e  kei  kee fe'
+    if (timestep==1) write(id,'(a28)') 't  qx  w2i  w2e  kei  kee fe'
     write(id,'(f8.2)',advance="no") dt*timestep
     write(id,'(a2,e13.6,a2,e13.6,a2,e13.6,a2,e13.6,a2,e13.6,a2,e13.6)') '  ',qx,'  ',w2i,'  ',w2e,'  ',kei,'  ',kee,'  ',fe
     endfile id
