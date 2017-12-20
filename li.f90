@@ -691,7 +691,7 @@ subroutine diagnostics
 
   implicit none
   integer :: id,m,i,j
-  real(8) ::xpdx,ypdy,wx,wy,qx,myqx,w2i,myw2i,w2e,myw2e,mykei,kei,mykee,kee
+  real(8) ::xpdx,ypdy,wx,wy,qx,myqx,w2i,myw2i,w2e,myw2e,mykei,kei,mykee,kee,fe
   character*5 :: fl
   character*70 :: flnm
 
@@ -708,6 +708,7 @@ subroutine diagnostics
   myw2e=0
   mykei=0
   mykee=0
+
   do m=1,ni
     !net ion heat flux in x-direction
     myqx = myqx + wi1(m)*vxi(m)*(vxi(m)**2+vyi(m)**2+vzi(m)**2)
@@ -731,13 +732,23 @@ subroutine diagnostics
   kei=kei/dble(tni)
   kee=kee/dble(tne)
 
+  !field energy
+  fe=0.
+  do i=1,nx-1
+    do j=0,ny-1
+      fe = fe + phi(i,j)*den(i,j)
+    end do
+  end do
+
+  fe = 0.5*dx*dy*fe
+
   if (myid==0) then
     flnm='diagn.out'
     open(id,file=flnm,form='formatted',status='unknown',&
       position='append')
-    if (timestep==1) write(id) 't  qx  w2i  w2e  kei  kee'
+    if (timestep==1) write(id) 't  qx  w2i  w2e  kei  kee fe'
     write(id,'(f8.2)',advance="no") dt*timestep
-    write(id,'(a2,e13.6,a2,e13.6,a2,e13.6,a2,e13.6,a2,e13.6)') '  ',qx,'  ',w2i,'  ',w2e,'  ',kei,'  ',kee
+    write(id,'(a2,e13.6,a2,e13.6,a2,e13.6,a2,e13.6,a2,e13.6,a2,e13.6)') '  ',qx,'  ',w2i,'  ',w2e,'  ',kei,'  ',kee,'  ',fe
     endfile id
     close(id)
   endif
