@@ -36,10 +36,10 @@ module li_com
 
 ! particle array declarations
   ! ions
-  real(8),dimension(:),allocatable :: xi,yi,vxi,vyi,vzi
+  real(8),dimension(:),allocatable :: xi,yi,vxi,vyi,vpari !vy is in rotated frame!
   real(8),dimension(:),allocatable :: wi0,wi1
   ! electrons
-  real(8),dimension(:),allocatable :: xe0,ye0,xe1,ye1,vpe
+  real(8),dimension(:),allocatable :: xe0,ye0,xe1,ye1,vpare
   real(8),dimension(:),allocatable :: we0,we1
   
 
@@ -74,10 +74,10 @@ subroutine init_com
 
 ! particle allocation
   allocate(xi(1:ni),yi(1:ni))
-  allocate(vxi(1:ni),vyi(1:ni),vzi(1:ni))
+  allocate(vxi(1:ni),vyi(1:ni),vpari(1:ni))
   allocate(wi0(1:ni),wi1(1:ni))
   allocate(xe0(1:ne),ye0(1:ne),xe1(1:ne),ye1(1:ne))
-  allocate(vpe(1:ne))
+  allocate(vpare(1:ne))
   allocate(we0(1:ne),we1(1:ne))
 
 ! grid allocation
@@ -107,10 +107,10 @@ subroutine finalize_com
 
 ! particle deallocation
   deallocate(xi,yi)
-  deallocate(vxi,vyi,vzi)
+  deallocate(vxi,vyi,vpari)
   deallocate(wi0,wi1)
   deallocate(xe0,ye0,xe1,ye1)
-  deallocate(vpe)
+  deallocate(vpare)
   deallocate(we0,we1)
 
 ! grid deallocation

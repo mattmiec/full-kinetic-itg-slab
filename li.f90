@@ -193,7 +193,7 @@ subroutine load
 !   load maxwellian velocities
     vxi(m)=dinvnorm(revers(myid*ni+m,3))
     vyi(m)=dinvnorm(revers(myid*ni+m,5))
-    vzi(m)=dinvnorm(revers(myid*ni+m,7))
+    vpari(m)=dinvnorm(revers(myid*ni+m,7))
 !   initialize weights
     if (initphi /= 1) wi1(m)=amp*dsin(pi2*xi(m)/lx)*dsin(pi2*yi(m)/ly)
   end do
@@ -204,7 +204,7 @@ subroutine load
     xe1(m)=lx*revers(myid*ne+m,2)
     ye1(m)=ly*(dble(myid*ne+m)-0.5)/dble(tne)
 !   load maxwellian velocities
-    vpe(m)=dinvnorm(revers(myid*ne+m,3))/sqrt(memip)
+    vpare(m)=dinvnorm(revers(myid*ne+m,3))/sqrt(memip)
 !   initialize weights
     if (initphi /= 1) we1(m)=amp*dsin(pi2*xe1(m)/lx)*dsin(pi2*ye1(m)/ly)
   end do
@@ -434,26 +434,25 @@ subroutine epush
       ex(i,j+1)*wx*(1.0-wy)+ex(i+1,j+1)*(1.0-wx)*(1.0-wy)
     ay=ey(i,j)*wx*wy+ey(i+1,j)*(1.0-wx)*wy+&
       ey(i,j+1)*wx*(1.0-wy)+ey(i+1,j+1)*(1.0-wx)*(1.0-wy)
-    ! 1/2 velocity push
-    vxi(m)=vxi(m)+.5*dt*ax*enlin
-    vyi(m)=vyi(m)+.5*dt*ay*enlin
-    ! full velocity rotation (theta,dt,-theta)
-    vxt=cdt*vxi(m)+sdt*cth*vyi(m)-sdt*sth*vzi(m)
-    vyt=-1.0*sdt*cth*vxi(m)+(cdt*cth**2+sth**2)*vyi(m)&
-      +(-1.0*cdt*sth*cth+sth*cth)*vzi(m)
-    vzi(m)=sdt*sth*vxi(m)+(-1.0*cdt*sth*cth+sth*cth)*vyi(m)&
-      +(cdt*sth**2+cth**2)*vzi(m)
-    vxi(m)=vxt
-    vyi(m)=vyt
-    ! 1/2 velocity push
-    vxi(m)=vxi(m)+.5*dt*ax*enlin
-    vyi(m)=vyi(m)+.5*dt*ay*enlin
+    ! 1/2 perp velocity push (note that vy is in rotated frame)
+    vxi(m)=vxi(m)+.5*dt*ax*eperpi
+    vyi(m)=vyi(m)+.5*dt*ay*cth*eperpi
+    ! full velocity rotation (note that vy is in rotated frame)
+    vxt = cdt*vxi(m)+sdt*vyi(m)
+    vyt = -1.0*sdt*vxi(m) + cdt*vyi(m)
+    vxi(m) = vxt
+    vyi(m) = vyt
+    ! 1/2 perp velocity push (note that vy is in rotated frame)
+    vxi(m) = vxi(m) + .5*dt*ax*eperpi
+    vyi(m) = vyi(m) + .5*dt*ay*cth*eperpi
+    ! parallel velocity push
+    vpari(m) = vpari(m) + dt*ay*sth*epari
     ! weight equation terms
-    vdv=vxi(m)**2+vyi(m)**2+vzi(m)**2
-    edv=vxi(m)*ax+vyi(m)*ay
-    kap=kapni+kapti*(.5*vdv-1.5)
+    vdv = vxi(m)**2+vyi(m)**2+vpari(m)**2
+    edv = vxi(m)*ax + vyi(m)*ay*cth + vpari(m)*ay*sth
+    kap = kapni+kapti*(.5*vdv-1.5)
     ! explicit 1/2 weight advance
-    wi0(m)=wi0(m)+.5*dt*(1-wi0(m)*wnlin)*(edv+cth*ay*kap)
+    wi0(m)=wi0(m)+.5*dt*(1-wi0(m)*weighti)*(edv+cth*ay*kap)
     ! full position advance
     xi(m)=xi(m)+dt*vxi(m)
     yi(m)=yi(m)+dt*vyi(m)
@@ -477,15 +476,18 @@ subroutine epush
     ay=ey(i,j)*wx*wy+ey(i+1,j)*(1.0-wx)*wy+&
       ey(i,j+1)*wx*(1.0-wy)+ey(i+1,j+1)*(1.0-wx)*(1.0-wy)
     ! full parallel velocity push
-    vpe(m)=vpe(m)-dt*ay*sth*enlin/memip
+    vpare(m)=vpare(m) - dt*ay*sth*epare/memip
     ! weight equation terms
-    vdv=vpe(m)**2
+    vdv=vpare(m)**2
     kap=kapne+kapte*(.5*memip*vdv-1.5)
     ! explicit 1/2 weight advance
-    we0(m)=we0(m)-.5*dt*(1-we0(m)*wnlin)*(sth*ay*vpe(m)-cth*ay*kap)
+    we0(m)=we0(m)-.5*dt*(1-we0(m)*weighte)*(sth*ay*vpare(m)-cth*ay*kap)
     ! explicit part of position advance
-    xe0(m)=xe0(m)+.5*dt*ay*cth
-    ye0(m)=ye0(m)-.5*dt*ax*cth+dt*sth*vpe(m)
+    xe0(m) = xe0(m) + .5*dt*ay*cth*eperpe
+    ye0(m) = ye0(m) - .5*dt*ax*cth*eperpe + dt*sth*vpare(m)
+    ! initial guess for implicit position
+    xe1(m) = xe0(m) + .5*dt*ay*cth*eperpe
+    ye1(m) = ye0(m) - .5*dt*ax*cth*eperpe
     ! periodic boundaries
     xe0(m)=xe0(m)-lx*dble(floor(xe0(m)/lx))
     ye0(m)=ye0(m)-ly*dble(floor(ye0(m)/ly))
@@ -518,11 +520,11 @@ subroutine ipush
     ay=ey(i,j)*wx*wy+ey(i+1,j)*(1.0-wx)*wy+&
       ey(i,j+1)*wx*(1.0-wy)+ey(i+1,j+1)*(1.0-wx)*(1.0-wy)
     ! weight equation terms
-    vdv=vxi(m)**2+vyi(m)**2+vzi(m)**2
-    edv=vxi(m)*ax+vyi(m)*ay
-    kap=kapni+kapti*(.5*vdv-1.5)
+    vdv = vxi(m)**2+vyi(m)**2+vpari(m)**2
+    edv = vxi(m)*ax + vyi(m)*ay*cth + vpari(m)*ay*sth
+    kap = kapni+kapti*(.5*vdv-1.5)
     ! implicit weight advance
-    wi1(m)=wi0(m)+.5*dt*(1-wi1(m)*wnlin)*(edv+cth*ay*kap)
+    wi1(m)=wi0(m)+.5*dt*(1-wi1(m)*weighti)*(edv+cth*ay*kap)
   end do
 
   ! electrons
@@ -540,10 +542,10 @@ subroutine ipush
     ay=ey(i,j)*wx*wy+ey(i+1,j)*(1.0-wx)*wy+&
       ey(i,j+1)*wx*(1.0-wy)+ey(i+1,j+1)*(1.0-wx)*(1.0-wy)
     ! weight equation terms
-    vdv=vpe(m)**2
+    vdv=vpare(m)**2
     kap=kapne+kapte*(.5*memip*vdv-1.5)
     ! implicit part of weight advance
-    we1(m)=we0(m)-.5*dt*(1-we1(m)*wnlin)*(sth*ay*vpe(m)-cth*ay*kap)
+    we1(m)=we0(m)-.5*dt*(1-we1(m)*weighte)*(sth*ay*vpare(m)-cth*ay*kap)
     ! implicit part of position advance
     xe1(m)=xe0(m)+.5*dt*ay*cth
     ye1(m)=ye0(m)-.5*dt*ax*cth
@@ -590,10 +592,10 @@ subroutine temperature
     j=int(ypdy)
     wx=dble(i+1)-xpdx
     wy=dble(j+1)-ypdy
-    mytempxy(i,j)=mytempxy(i,j)+wi1(m)*wx*wy*(vxi(m)**2+(cth*vyi(m)-sth*vzi(m))**2)
-    mytempxy(i+1,j)=mytempxy(i+1,j)+wi1(m)*(1.0-wx)*wy*(vxi(m)**2+(cth*vyi(m)-sth*vzi(m))**2)
-    mytempxy(i,j+1)=mytempxy(i,j+1)+wi1(m)*wx*(1.0-wy)*(vxi(m)**2+(cth*vyi(m)-sth*vzi(m))**2)
-    mytempxy(i+1,j+1)=mytempxy(i+1,j+1)+wi1(m)*(1.0-wx)*(1.0-wy)*(vxi(m)**2+(cth*vyi(m)-sth*vzi(m))**2)
+    mytempxy(i,j)=mytempxy(i,j)+wi1(m)*wx*wy*(vxi(m)**2+(cth*vyi(m)-sth*vpari(m))**2)
+    mytempxy(i+1,j)=mytempxy(i+1,j)+wi1(m)*(1.0-wx)*wy*(vxi(m)**2+(cth*vyi(m)-sth*vpari(m))**2)
+    mytempxy(i,j+1)=mytempxy(i,j+1)+wi1(m)*wx*(1.0-wy)*(vxi(m)**2+(cth*vyi(m)-sth*vpari(m))**2)
+    mytempxy(i+1,j+1)=mytempxy(i+1,j+1)+wi1(m)*(1.0-wx)*(1.0-wy)*(vxi(m)**2+(cth*vyi(m)-sth*vpari(m))**2)
   end do
  
   call mpi_allreduce(mytempxy,tempxy,(nx+1)*(ny+1),mpi_real8,mpi_sum,mpi_comm_world,ierr)
@@ -715,13 +717,13 @@ subroutine diagnostics
 
   do m=1,ni
     !net ion heat flux in x-direction
-    myqx = myqx + wi1(m)*vxi(m)*(vxi(m)**2+vyi(m)**2+vzi(m)**2)
+    myqx = myqx + wi1(m)*vxi(m)*(vxi(m)**2+vyi(m)**2+vpari(m)**2)
     !weight squared sum
     myw2i = myw2i + wi1(m)**2
     myw2e = myw2e + we1(m)**2
     !kinetic energies
-    mykei = mykei + 0.5*wi1(m)*(vxi(m)**2+vyi(m)**2+vzi(m)**2)
-    mykee = mykee + 0.5*we1(m)*memip*vpe(m)**2
+    mykei = mykei + 0.5*wi1(m)*(vxi(m)**2+vyi(m)**2+vpari(m)**2)
+    mykee = mykee + 0.5*we1(m)*memip*vpare(m)**2
   end do
 
   call mpi_allreduce(myqx,qx,1,mpi_real8,mpi_sum,mpi_comm_world,ierr)
@@ -784,12 +786,12 @@ subroutine zdiagnostics
     wx=dble(i+1)-xpdx
     myuy(i)=myuy(i)+wi1(m)*wx*vyi(m)
     myuy(i+1)=myuy(i+1)+wi1(m)*(1.0-wx)*vyi(m)
-    myuz(i)=myuz(i)+wi1(m)*wx*vzi(m)
-    myuz(i+1)=myuz(i+1)+wi1(m)*(1.0-wx)*vzi(m)
+    myuz(i)=myuz(i)+wi1(m)*wx*vpari(m)
+    myuz(i+1)=myuz(i+1)+wi1(m)*(1.0-wx)*vpari(m)
     mypx(i)=mypx(i)+wi1(m)*wx*vxi(m)**2
     mypx(i+1)=mypx(i+1)+wi1(m)*(1.0-wx)*vxi(m)**2
-    mypy(i)=mypy(i)+wi1(m)*wx*(cth*vyi(m)-sth*vzi(m))**2
-    mypy(i+1)=mypy(i+1)+wi1(m)*(1.0-wx)*(cth*vyi(m)-sth*vzi(m))**2
+    mypy(i)=mypy(i)+wi1(m)*wx*(cth*vyi(m)-sth*vpari(m))**2
+    mypy(i+1)=mypy(i+1)+wi1(m)*(1.0-wx)*(cth*vyi(m)-sth*vpari(m))**2
   enddo
 
   call mpi_allreduce(myuy,uy,nx+1,mpi_real8,mpi_sum,mpi_comm_world,ierr)
