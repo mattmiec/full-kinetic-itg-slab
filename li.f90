@@ -440,7 +440,7 @@ subroutine epush
     vxi(m)=vxi(m)+.5*dt*ax*eperpi
     vyi(m)=vyi(m)+.5*dt*ay*cth*eperpi
     ! full velocity rotation (note that vy is in rotated frame)
-    vxt = cdt*vxi(m)+sdt*vyi(m)
+    vxt = cdt*vxi(m) + sdt*vyi(m)
     vyt = -1.0*sdt*vxi(m) + cdt*vyi(m)
     vxi(m) = vxt
     vyi(m) = vyt
@@ -456,8 +456,8 @@ subroutine epush
     ! explicit 1/2 weight advance
     wi0(m)=wi0(m)+.5*dt*(1-wi0(m)*weighti)*(edv+cth*ay*kap)
     ! full position advance
-    xi(m)=xi(m)+dt*vxi(m)
-    yi(m)=yi(m)+dt*vyi(m)
+    xi(m) = xi(m) + dt*vxi(m)
+    yi(m) = yi(m) + dt*cth*vyi(m) + dt*sth*vpari(m)
     ! periodic boundaries
     xi(m)=xi(m)-lx*dble(floor(xi(m)/lx))
     yi(m)=yi(m)-ly*dble(floor(yi(m)/ly))
@@ -522,11 +522,11 @@ subroutine ipush
     ay=ey(i,j)*wx*wy+ey(i+1,j)*(1.0-wx)*wy+&
       ey(i,j+1)*wx*(1.0-wy)+ey(i+1,j+1)*(1.0-wx)*(1.0-wy)
     ! weight equation terms
-    vdv = vxi(m)**2+vyi(m)**2+vpari(m)**2
+    vdv = vxi(m)**2 + vyi(m)**2 + vpari(m)**2
     edv = vxi(m)*ax + vyi(m)*ay*cth + vpari(m)*ay*sth
-    kap = kapni+kapti*(.5*vdv-1.5)
+    kap = kapni + kapti*(.5*vdv-1.5)
     ! implicit weight advance
-    wi1(m)=wi0(m)+.5*dt*(1-wi1(m)*weighti)*(edv+cth*ay*kap)
+    wi1(m) = wi0(m) + .5*dt*(1-wi1(m)*weighti)*(edv+cth*ay*kap)
   end do
 
   ! electrons

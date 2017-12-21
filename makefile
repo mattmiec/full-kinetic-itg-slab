@@ -1,5 +1,6 @@
 F90 = ftn
-OPTS = -O3 #-CB -traceback
+OPTS = -O3 
+#OPTS = -check all -traceback
 LIB = $(DFFTPACK)
 OBJS = li_com.f90 fft_wrapper.f90 fcnt.f90 li.f90
 
