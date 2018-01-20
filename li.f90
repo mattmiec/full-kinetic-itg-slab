@@ -112,7 +112,7 @@ subroutine initialize
       read(115,*) dumchar
       read(115,*) kapni,kapti,kapne,kapte
       read(115,*) dumchar
-      read(115,*) teti,memif,memip
+      read(115,*) teti,memif,dke,memip
       read(115,*) dumchar
       read(115,*) dumchar
       read(115,*) eperpi,epari,weighti,eperpe,epare,weighte
@@ -244,18 +244,20 @@ subroutine accumulate
   end do
 
   ! electrons
-  do m=1,ne
-    xpdx=xe1(m)/dx
-    ypdy=ye1(m)/dy
-    i=int(xpdx)
-    j=int(ypdy)
-    wx=dble(i+1)-xpdx
-    wy=dble(j+1)-ypdy
-    mydene(i,j)=mydene(i,j)+we1(m)*wx*wy
-    mydene(i+1,j)=mydene(i+1,j)+we1(m)*(1.0-wx)*wy
-    mydene(i,j+1)=mydene(i,j+1)+we1(m)*wx*(1.0-wy)
-    mydene(i+1,j+1)=mydene(i+1,j+1)+we1(m)*(1.0-wx)*(1.0-wy)
-  end do
+  if (dke==1)
+    do m=1,ne
+      xpdx=xe1(m)/dx
+      ypdy=ye1(m)/dy
+      i=int(xpdx)
+      j=int(ypdy)
+      wx=dble(i+1)-xpdx
+      wy=dble(j+1)-ypdy
+      mydene(i,j)=mydene(i,j)+we1(m)*wx*wy
+      mydene(i+1,j)=mydene(i+1,j)+we1(m)*(1.0-wx)*wy
+      mydene(i,j+1)=mydene(i,j+1)+we1(m)*wx*(1.0-wy)
+      mydene(i+1,j+1)=mydene(i+1,j+1)+we1(m)*(1.0-wx)*(1.0-wy)
+    end do
+  end if
 
   call mpi_allreduce(mydeni,deni,(nx+1)*(ny+1),mpi_real8,mpi_sum,mpi_comm_world,ierr)
   call mpi_allreduce(mydene,dene,(nx+1)*(ny+1),mpi_real8,mpi_sum,mpi_comm_world,ierr)
@@ -464,36 +466,38 @@ subroutine epush
   end do
 
   ! electrons
-  do m=1,ne
-    ! interpolation weights
-    xpdx=xe0(m)/dx
-    ypdy=ye0(m)/dy
-    i=int(xpdx)
-    j=int(ypdy)
-    wx=dble(i+1)-xpdx
-    wy=dble(j+1)-ypdy
-    ! interpolate e-field
-    ax=ex(i,j)*wx*wy+ex(i+1,j)*(1.0-wx)*wy+&
-      ex(i,j+1)*wx*(1.0-wy)+ex(i+1,j+1)*(1.0-wx)*(1.0-wy)
-    ay=ey(i,j)*wx*wy+ey(i+1,j)*(1.0-wx)*wy+&
-      ey(i,j+1)*wx*(1.0-wy)+ey(i+1,j+1)*(1.0-wx)*(1.0-wy)
-    ! full parallel velocity push
-    vpare(m)=vpare(m) - dt*ay*sth*epare/memip
-    ! weight equation terms
-    vdv=vpare(m)**2
-    kap=kapne+kapte*(.5*memip*vdv-1.5)
-    ! explicit 1/2 weight advance
-    we0(m)=we0(m)-.5*dt*(1-we0(m)*weighte)*(sth*ay*vpare(m)-cth*ay*kap)
-    ! explicit part of position advance
-    xe0(m) = xe0(m) + .5*dt*ay*cth*eperpe
-    ye0(m) = ye0(m) - .5*dt*ax*cth*eperpe + dt*sth*vpare(m)
-    ! initial guess for implicit position
-    xe1(m) = xe0(m) + .5*dt*ay*cth*eperpe
-    ye1(m) = ye0(m) - .5*dt*ax*cth*eperpe
-    ! periodic boundaries
-    xe0(m)=xe0(m)-lx*dble(floor(xe0(m)/lx))
-    ye0(m)=ye0(m)-ly*dble(floor(ye0(m)/ly))
-  end do
+  if (dke==1):
+    do m=1,ne
+      ! interpolation weights
+      xpdx=xe0(m)/dx
+      ypdy=ye0(m)/dy
+      i=int(xpdx)
+      j=int(ypdy)
+      wx=dble(i+1)-xpdx
+      wy=dble(j+1)-ypdy
+      ! interpolate e-field
+      ax=ex(i,j)*wx*wy+ex(i+1,j)*(1.0-wx)*wy+&
+        ex(i,j+1)*wx*(1.0-wy)+ex(i+1,j+1)*(1.0-wx)*(1.0-wy)
+      ay=ey(i,j)*wx*wy+ey(i+1,j)*(1.0-wx)*wy+&
+        ey(i,j+1)*wx*(1.0-wy)+ey(i+1,j+1)*(1.0-wx)*(1.0-wy)
+      ! full parallel velocity push
+      vpare(m)=vpare(m) - dt*ay*sth*epare/memip
+      ! weight equation terms
+      vdv=vpare(m)**2
+      kap=kapne+kapte*(.5*memip*vdv-1.5)
+      ! explicit 1/2 weight advance
+      we0(m)=we0(m)-.5*dt*(1-we0(m)*weighte)*(sth*ay*vpare(m)-cth*ay*kap)
+      ! explicit part of position advance
+      xe0(m) = xe0(m) + .5*dt*ay*cth*eperpe
+      ye0(m) = ye0(m) - .5*dt*ax*cth*eperpe + dt*sth*vpare(m)
+      ! initial guess for implicit position
+      xe1(m) = xe0(m) + .5*dt*ay*cth*eperpe
+      ye1(m) = ye0(m) - .5*dt*ax*cth*eperpe
+      ! periodic boundaries
+      xe0(m)=xe0(m)-lx*dble(floor(xe0(m)/lx))
+      ye0(m)=ye0(m)-ly*dble(floor(ye0(m)/ly))
+    end do
+  end if
 
 end
 
@@ -530,31 +534,33 @@ subroutine ipush
   end do
 
   ! electrons
-  do m=1,ne
-    ! interpolation weights
-    xpdx=xe1(m)/dx
-    ypdy=ye1(m)/dy
-    i=int(xpdx)
-    j=int(ypdy)
-    wx=dble(i+1)-xpdx
-    wy=dble(j+1)-ypdy
-    ! interpolate e-field
-    ax=ex(i,j)*wx*wy+ex(i+1,j)*(1.0-wx)*wy+&
-      ex(i,j+1)*wx*(1.0-wy)+ex(i+1,j+1)*(1.0-wx)*(1.0-wy)
-    ay=ey(i,j)*wx*wy+ey(i+1,j)*(1.0-wx)*wy+&
-      ey(i,j+1)*wx*(1.0-wy)+ey(i+1,j+1)*(1.0-wx)*(1.0-wy)
-    ! weight equation terms
-    vdv=vpare(m)**2
-    kap=kapne+kapte*(.5*memip*vdv-1.5)
-    ! implicit part of weight advance
-    we1(m)=we0(m)-.5*dt*(1-we1(m)*weighte)*(sth*ay*vpare(m)-cth*ay*kap)
-    ! implicit part of position advance
-    xe1(m)=xe0(m)+.5*dt*ay*cth
-    ye1(m)=ye0(m)-.5*dt*ax*cth
-    ! periodic boundaries
-    xe1(m)=xe1(m)-lx*dble(floor(xe1(m)/lx))
-    ye1(m)=ye1(m)-ly*dble(floor(ye1(m)/ly))
-  end do
+  if (dke==1)
+    do m=1,ne
+      ! interpolation weights
+      xpdx=xe1(m)/dx
+      ypdy=ye1(m)/dy
+      i=int(xpdx)
+      j=int(ypdy)
+      wx=dble(i+1)-xpdx
+      wy=dble(j+1)-ypdy
+      ! interpolate e-field
+      ax=ex(i,j)*wx*wy+ex(i+1,j)*(1.0-wx)*wy+&
+        ex(i,j+1)*wx*(1.0-wy)+ex(i+1,j+1)*(1.0-wx)*(1.0-wy)
+      ay=ey(i,j)*wx*wy+ey(i+1,j)*(1.0-wx)*wy+&
+        ey(i,j+1)*wx*(1.0-wy)+ey(i+1,j+1)*(1.0-wx)*(1.0-wy)
+      ! weight equation terms
+      vdv=vpare(m)**2
+      kap=kapne+kapte*(.5*memip*vdv-1.5)
+      ! implicit part of weight advance
+      we1(m)=we0(m)-.5*dt*(1-we1(m)*weighte)*(sth*ay*vpare(m)-cth*ay*kap)
+      ! implicit part of position advance
+      xe1(m)=xe0(m)+.5*dt*ay*cth
+      ye1(m)=ye0(m)-.5*dt*ax*cth
+      ! periodic boundaries
+      xe1(m)=xe1(m)-lx*dble(floor(xe1(m)/lx))
+      ye1(m)=ye1(m)-ly*dble(floor(ye1(m)/ly))
+    end do
+  end if
 
 end
 
@@ -565,9 +571,11 @@ subroutine update
   implicit none
 
   wi0 = wi1
-  xe0 = xe1
-  ye0 = ye1
-  we0 = we1
+  if (dke==1)
+    xe0 = xe1
+    ye0 = ye1
+    we0 = we1
+  end if
 
 end
 

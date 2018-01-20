@@ -20,8 +20,8 @@
 '  kappani     kappati     kappane     kappate                         '
    0.0         0.05        0.0         0.0   
 
-'  teti        memif       memip                                       '
-   1.0         0.1         0.0005
+'  teti        memif       dke         memip                           '
+   1.0         0.1         0           0.0005
 
 '--nonlinearities------------------------------------------------------'
 

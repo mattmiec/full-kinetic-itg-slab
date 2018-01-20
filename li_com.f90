@@ -6,7 +6,7 @@ module li_com
 ! li.in primary input variables
   integer :: nx,ny,nt
   real(8) :: tol,lx,ly,dt,theta,amp
-  integer :: ni,ne,initphi,ninit
+  integer :: ni,ne,initphi,ninit,dke
   real(8) :: kapni,kapti,kapne,kapte
   real(8) :: teti,memif,memip
   integer :: eperpi,epari,weighti,eperpe,epare,weighte
