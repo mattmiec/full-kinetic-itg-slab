@@ -161,6 +161,8 @@ subroutine initialize
       kp2 = kx*kx + ky*ky
       filt = exp(-1*(xshape**2*kx**2+yshape**2*ky**2)**2)
       coeff(i,j) = filt/(memif*teti*kp2)
+      ! use adiabatic response for k_par /= 0
+      if ((dke /= 1) .and. (kj /= 0)) coeff(i,j) = filt
       ! zonal flow excluded if zflow != 1
       if ((zflow /= 1) .and. kj==0) coeff(i,j)=0.
       ! isolate 1,1 and 2,0 if isolate == 1
@@ -168,8 +170,7 @@ subroutine initialize
       ! remove odd kx modes for ky=0
       if ((odd /= 1) .and. (kj == 0) .and. (mod(ki,2) == 1)) coeff(i,j) = 0
       if (myid==0) then
-        print*,'i = ',i,', j = ',j
-        print*,'coeff =',coeff(i,j)
+        print*,'coeff(',i,',',j,') = ',coeff(i,j)
       end if
     end do
   end do
@@ -201,15 +202,17 @@ subroutine load
   end do
 
   ! electrons
-  do m=1,ne
-!   load particle positions
-    xe1(m)=lx*revers(myid*ne+m,2)
-    ye1(m)=ly*(dble(myid*ne+m)-0.5)/dble(tne)
-!   load maxwellian velocities
-    vpare(m)=dinvnorm(revers(myid*ne+m,3))/sqrt(memip)
-!   initialize weights
-    if (initphi /= 1) we1(m)=amp*dsin(pi2*xe1(m)/lx)*dsin(pi2*ye1(m)/ly)
-  end do
+  if (dke == 1) then
+    do m=1,ne
+  !   load particle positions
+      xe1(m)=lx*revers(myid*ne+m,2)
+      ye1(m)=ly*(dble(myid*ne+m)-0.5)/dble(tne)
+  !   load maxwellian velocities
+      vpare(m)=dinvnorm(revers(myid*ne+m,3))/sqrt(memip)
+  !   initialize weights
+      if (initphi /= 1) we1(m)=amp*dsin(pi2*xe1(m)/lx)*dsin(pi2*ye1(m)/ly)
+    end do
+  end if
 
 end
 
@@ -244,7 +247,7 @@ subroutine accumulate
   end do
 
   ! electrons
-  if (dke==1)
+  if (dke==1) then
     do m=1,ne
       xpdx=xe1(m)/dx
       ypdy=ye1(m)/dy
@@ -260,24 +263,28 @@ subroutine accumulate
   end if
 
   call mpi_allreduce(mydeni,deni,(nx+1)*(ny+1),mpi_real8,mpi_sum,mpi_comm_world,ierr)
-  call mpi_allreduce(mydene,dene,(nx+1)*(ny+1),mpi_real8,mpi_sum,mpi_comm_world,ierr)
+  if (dke == 1) call mpi_allreduce(mydene,dene,(nx+1)*(ny+1),mpi_real8,mpi_sum,mpi_comm_world,ierr)
 
   !divide by particles per cell
   deni=deni*dble(nx)*dble(ny)/dble(tni)
-  dene=dene*dble(nx)*dble(ny)/dble(tne)
+  if (dke == 1) dene=dene*dble(nx)*dble(ny)/dble(tne)
 
   do i=0,nx
     deni(i,0)=deni(i,0)+deni(i,ny)
     deni(i,ny)=deni(i,0)
-    dene(i,0)=dene(i,0)+dene(i,ny)
-    dene(i,ny)=dene(i,0)
+    if (dke == 1) then
+      dene(i,0)=dene(i,0)+dene(i,ny)
+      dene(i,ny)=dene(i,0)
+    end if
   end do
 
   do j=0,ny
     deni(0,j)=deni(0,j)+deni(nx,j)
     deni(nx,j)=deni(0,j)
-    dene(0,j)=dene(0,j)+dene(nx,j)
-    dene(nx,j)=dene(0,j)
+    if (dke == 1) then
+      dene(0,j)=dene(0,j)+dene(nx,j)
+      dene(nx,j)=dene(0,j)
+    end if
   end do
 
   den = deni - dene
@@ -466,7 +473,7 @@ subroutine epush
   end do
 
   ! electrons
-  if (dke==1):
+  if (dke==1) then
     do m=1,ne
       ! interpolation weights
       xpdx=xe0(m)/dx
@@ -534,7 +541,7 @@ subroutine ipush
   end do
 
   ! electrons
-  if (dke==1)
+  if (dke==1) then
     do m=1,ne
       ! interpolation weights
       xpdx=xe1(m)/dx
@@ -571,7 +578,7 @@ subroutine update
   implicit none
 
   wi0 = wi1
-  if (dke==1)
+  if (dke==1) then
     xe0 = xe1
     ye0 = ye1
     we0 = we1
