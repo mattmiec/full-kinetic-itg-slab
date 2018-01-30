@@ -20,7 +20,7 @@ module li_com
   real(8) :: dx,dy
   real(8) :: sdt,cdt,sth,cth
   real(8) :: totvol,n0
-  integer :: timestep
+  integer :: tstep
   integer :: iseed
   real(8) :: pi,pi2
   real(8) :: res

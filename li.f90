@@ -25,16 +25,17 @@ program li
   call field
 
   !main loop
-  do timestep=1,nt
+  do tstep=1,nt
 
     doprint=0
-    if (myid==0.and.mod(timestep,nprint).eq.0) doprint=1
+    if (myid==0.and.mod(tstep,nprint).eq.0) doprint=1
     if (doprint.eq.1) print *
-    if (doprint.eq.1) print *, 'timestep', timestep
+    if (doprint.eq.1) print *, 'tstep', tstep
 
+    !explicit part of push
     call epush
 
-    !iterate over ipush
+    !iterate over implicit part of push
     res=1
     do while (res.gt.tol)
       call ipush
@@ -44,22 +45,24 @@ program li
       if (doprint.eq.1) print *,'residual =',res
     end do
 
+    !set new t0 arrays to old t1 arrays
     call update
 
-    call temperature
-
-    !file output
+    !output
     call modeout(phihist,'phist',11)
     call modeout(denhist,'dhist',12)
     call modeout(temphist,'thist',13)
-    call diagnostics
-    !call zdiagnostics
-    if (mod(timestep,nrec).eq.0) then
+    if (mod(tstep,nrec).eq.0) then
       call gridout(phi,'phixy',14)
-      call gridout(den,'denxy',15)
-      call gridout(deni,'denii',17)
-      call gridout(dene,'denee',18)
+      if (dke /= 1) then
+        call gridout(den,'denxy',15)
+      else
+        call gridout(deni,'denii',17)
+        call gridout(dene,'denee',18)
+      end if
       call gridout(tempxy,'temxy',16)
+      call gendiagnostics
+      !call ionvelocity
     end if
 
   end do
@@ -230,7 +233,7 @@ subroutine accumulate
   denlast=den
   den=0
   mydeni=0
-  mydene=0
+  if (dke == 1) mydene=0
 
   ! ions
   do m=1,ni
@@ -287,7 +290,11 @@ subroutine accumulate
     end if
   end do
 
-  den = deni - dene
+  if (dke == 1) then
+    den = deni - dene
+  else
+    den = deni
+  end if
 
 end
 
@@ -340,7 +347,7 @@ subroutine field
   end do
 
   !initialize if initphi
-  if ((timestep.le.ninit).and.(initphi.eq.1)) then
+  if ((tstep.le.ninit).and.(initphi.eq.1)) then
       phit = 0.
       phit(1,1)=amp
       phit(nx-1,1)=-amp
@@ -587,72 +594,7 @@ subroutine update
 end
 
 !-----------------------------------------------------------------------
-!-----------------------------------------------------------------------
-!-----------------------------------------------------------------------
-
-subroutine temperature
-
-  !calculate tperp on grid
-
-  implicit none
-  real(8) :: xpdx,ypdy,wx,wy
-  real(8) :: mytempxy(0:nx,0:ny)
-  integer :: i,j,m
-  complex(8) :: ktemp(0:nx-1,0:ny-1)
-
-  tempxy=0
-
-  do m=1,ni
-    xpdx=xi(m)/dx
-    ypdy=yi(m)/dy
-    i=int(xpdx)
-    j=int(ypdy)
-    wx=dble(i+1)-xpdx
-    wy=dble(j+1)-ypdy
-    mytempxy(i,j)=mytempxy(i,j)+wi1(m)*wx*wy*(vxi(m)**2+(cth*vyi(m)-sth*vpari(m))**2)
-    mytempxy(i+1,j)=mytempxy(i+1,j)+wi1(m)*(1.0-wx)*wy*(vxi(m)**2+(cth*vyi(m)-sth*vpari(m))**2)
-    mytempxy(i,j+1)=mytempxy(i,j+1)+wi1(m)*wx*(1.0-wy)*(vxi(m)**2+(cth*vyi(m)-sth*vpari(m))**2)
-    mytempxy(i+1,j+1)=mytempxy(i+1,j+1)+wi1(m)*(1.0-wx)*(1.0-wy)*(vxi(m)**2+(cth*vyi(m)-sth*vpari(m))**2)
-  end do
- 
-  call mpi_allreduce(mytempxy,tempxy,(nx+1)*(ny+1),mpi_real8,mpi_sum,mpi_comm_world,ierr)
-
-  !divide by particles per cell
-  tempxy=tempxy*dble(nx)*dble(ny)/dble(tni)
-
-  do i=0,nx
-    tempxy(i,0)=tempxy(i,0)+tempxy(i,ny)
-    tempxy(i,ny)=tempxy(i,0)
-  end do
-
-  do j=0,ny
-    tempxy(0,j)=tempxy(0,j)+tempxy(nx,j)
-    tempxy(nx,j)=tempxy(0,j)
-  end do
-
-  !transform to record fourier space components
-  ktemp = tempxy(0:nx-1,0:ny-1)
-
-  do j=0,ny-1
-    call ccfft('x',-1,nx,ktemp(:,j))
-  end do
-
-  do i=0,nx-1
-    call ccfft('y',-1,ny,ktemp(i,:))
-  end do
-
-  ktemp = ktemp/nx/ny
-
-  !record selected modes
-  do i=1,nmode
-    temphist(i) = ktemp(modeindices(1,i),modeindices(2,i))
-  end do
-
-
-end
-
-!-----------------------------------------------------------------------
-!--------history subroutines--------------------------------------------
+!--------output subroutines---------------------------------------------
 !-----------------------------------------------------------------------
 
 subroutine modeout(hist,fl,id)
@@ -669,7 +611,7 @@ subroutine modeout(hist,fl,id)
     flnm=fl//'.out'
     open(id,file=flnm,form='formatted',status='unknown',&
       position='append')
-    write(id,'(f8.2)',advance="no") dt*timestep
+    write(id,'(f8.2)',advance="no") dt*tstep
     do i=1,nmode
       write(id,'(a2,e13.6,a2,e13.6)',advance="no") '  ',real(hist(i)),&
         '  ',imag(hist(i))
@@ -710,7 +652,7 @@ end
 
 !-----------------------------------------------------------------------
 
-subroutine diagnostics
+subroutine gendiagnostics
 
   implicit none
   integer :: id,m,i,j
@@ -737,23 +679,31 @@ subroutine diagnostics
     myqx = myqx + wi1(m)*vxi(m)*(vxi(m)**2+vyi(m)**2+vpari(m)**2)
     !weight squared sum
     myw2i = myw2i + wi1(m)**2
-    myw2e = myw2e + we1(m)**2
+    if (dke == 1) myw2e = myw2e + we1(m)**2
     !kinetic energies
     mykei = mykei + 0.5*wi1(m)*(vxi(m)**2+vyi(m)**2+vpari(m)**2)
-    mykee = mykee + 0.5*we1(m)*memip*vpare(m)**2
+    if (dke == 1) mykee = mykee + 0.5*we1(m)*memip*vpare(m)**2
   end do
 
   call mpi_allreduce(myqx,qx,1,mpi_real8,mpi_sum,mpi_comm_world,ierr)
   call mpi_allreduce(myw2i,w2i,1,mpi_real8,mpi_sum,mpi_comm_world,ierr)
-  call mpi_allreduce(myw2e,w2e,1,mpi_real8,mpi_sum,mpi_comm_world,ierr)
+  if (dke == 1) call mpi_allreduce(myw2e,w2e,1,mpi_real8,mpi_sum,mpi_comm_world,ierr)
   call mpi_allreduce(mykei,kei,1,mpi_real8,mpi_sum,mpi_comm_world,ierr)
-  call mpi_allreduce(mykee,kee,1,mpi_real8,mpi_sum,mpi_comm_world,ierr)
+  if (dke == 1) call mpi_allreduce(mykee,kee,1,mpi_real8,mpi_sum,mpi_comm_world,ierr)
 
   qx=qx/dble(tni)
   w2i=w2i/dble(tni)
-  w2e=w2e/dble(tne)
+  if (dke == 1) then
+    w2e=w2e/dble(tne)
+  else
+    w2e = 0.
+  end if
   kei=kei/dble(tni)
-  kee=kee/dble(tne)
+  if (dke == 1) then
+    kee=kee/dble(tne)
+  else
+    kee = 0.
+  end if
 
   !field energy
   fe=0.
@@ -769,122 +719,14 @@ subroutine diagnostics
     flnm='diagn.out'
     open(id,file=flnm,form='formatted',status='unknown',&
       position='append')
-    if (timestep==1) write(id,'(a28)') 't  qx  w2i  w2e  kei  kee fe'
-    write(id,'(f8.2)',advance="no") dt*timestep
+    if (tstep==1) write(id,'(a28)') 't  qx  w2i  w2e  kei  kee fe'
+    write(id,'(f8.2)',advance="no") dt*tstep
     write(id,'(a2,e13.6,a2,e13.6,a2,e13.6,a2,e13.6,a2,e13.6,a2,e13.6)') '  ',qx,'  ',w2i,'  ',w2e,'  ',kei,'  ',kee,'  ',fe
     endfile id
     close(id)
   endif
 
 end
-
-!-----------------------------------------------------------------------
-
-subroutine zdiagnostics
-
-  implicit none
-  integer :: i,m,il,ir,uyid,uzid,pxid,pyid
-  character*70 :: uyflnm,uzflnm,pxflnm,pyflnm
-  real(8) :: xpdx,wx,kx,p(0:nx)
-  real(8) :: myuy(0:nx),myuz(0:nx),mypx(0:nx),mypy(0:nx)
-
-  uy=0
-  myuy=0
-  uz=0
-  myuz=0
-  px=0
-  mypx=0
-  py=0
-  mypy=0
-
-  do m=1,ni
-    xpdx=xi(m)/dx
-    i=int(xpdx)
-    wx=dble(i+1)-xpdx
-    myuy(i)=myuy(i)+wi1(m)*wx*vyi(m)
-    myuy(i+1)=myuy(i+1)+wi1(m)*(1.0-wx)*vyi(m)
-    myuz(i)=myuz(i)+wi1(m)*wx*vpari(m)
-    myuz(i+1)=myuz(i+1)+wi1(m)*(1.0-wx)*vpari(m)
-    mypx(i)=mypx(i)+wi1(m)*wx*vxi(m)**2
-    mypx(i+1)=mypx(i+1)+wi1(m)*(1.0-wx)*vxi(m)**2
-    mypy(i)=mypy(i)+wi1(m)*wx*(cth*vyi(m)-sth*vpari(m))**2
-    mypy(i+1)=mypy(i+1)+wi1(m)*(1.0-wx)*(cth*vyi(m)-sth*vpari(m))**2
-  enddo
-
-  call mpi_allreduce(myuy,uy,nx+1,mpi_real8,mpi_sum,mpi_comm_world,ierr)
-  call mpi_allreduce(myuz,uz,nx+1,mpi_real8,mpi_sum,mpi_comm_world,ierr)
-  call mpi_allreduce(mypx,px,nx+1,mpi_real8,mpi_sum,mpi_comm_world,ierr)
-  call mpi_allreduce(mypy,py,nx+1,mpi_real8,mpi_sum,mpi_comm_world,ierr)
-
-  !divide by particles per column
-  uy=uy*dble(nx)/dble(tni)
-  uz=uz*dble(nx)/dble(tni)
-  px=px*dble(nx)/dble(tni)
-  py=py*dble(nx)/dble(tni)
-
-  !periodic boundaries
-  uy(0)=uy(0)+uy(nx)
-  uz(0)=uz(0)+uz(nx)
-  px(0)=px(0)+px(nx)
-  py(0)=py(0)+py(nx)
-  uy(nx)=uy(0)
-  uz(nx)=uz(0)
-  px(nx)=px(0)
-  py(nx)=py(0)
-
-  uyid=99
-  uzid=98
-  pxid=97
-  pyid=96
-
-  uyflnm='uy.out'
-  uzflnm='uz.out'
-  pxflnm='px.out'
-  pyflnm='py.out'
-
-  if (myid==0) then
-    open(uyid,file=uyflnm,form='formatted',status='unknown',&
-      position='append')
-    write(uyid,'(f8.2)',advance='no') dt*timestep
-    do i=0,nx
-      write(uyid,'(a2,e13.6)',advance='no') '  ',uy(i)
-    end do
-    write(uyid,*)
-    endfile uyid
-    close(uyid)
-  
-    open(uzid,file=uzflnm,form='formatted',status='unknown',&
-      position='append')
-    write(uzid,'(f8.2)',advance='no') dt*timestep
-    do i=0,nx
-      write(uzid,'(a2,e13.6)',advance='no') '  ',uz(i)
-    end do
-    write(uzid,*)
-    endfile uzid
-    close(uzid)
-  
-    open(pxid,file=pxflnm,form='formatted',status='unknown',&
-      position='append')
-    write(pxid,'(f8.2)',advance='no') dt*timestep
-    do i=0,nx
-      write(pxid,'(a2,e13.6)',advance='no') '  ',px(i)
-    end do
-    write(pxid,*)
-    endfile pxid
-    close(pxid)
-  
-    open(pyid,file=pyflnm,form='formatted',status='unknown',&
-      position='append')
-    write(pyid,'(f8.2)',advance='no') dt*timestep
-    do i=0,nx
-      write(pyid,'(a2,e13.6)',advance='no') '  ',py(i)
-    end do
-    write(pyid,*)
-    endfile pyid
-    close(pyid)
-  endif
- 
-  end
 
 !-----------------------------------------------------------------------
 
