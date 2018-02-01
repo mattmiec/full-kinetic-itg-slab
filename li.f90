@@ -121,7 +121,7 @@ subroutine initialize
       read(115,*) eperpi,epari,weighti,eperpe,epare,weighte
       read(115,*) dumchar
       read(115,*) dumchar
-      read(115,*) bounded,isolate,zflow,odd,xshape,yshape
+      read(115,*) reflect,isolate,zflow,oddmodes,xshape,yshape
       read(115,*) dumchar
       read(115,*) dumchar
       read(115,*) nrec,nprint,nmode
@@ -157,10 +157,15 @@ subroutine initialize
   do i=0,nx-1
     do j=0,ny-1
       coeff(i,j)=0.
-      ki = min(i,nx-i)
+      if (reflect == 1) then
+        ki = i
+        kx = pi*ki/lx
+      else
+        ki = min(i,nx-i)
+        kx = pi2*ki/lx
+      end if
       kj = min(j,ny-j)
-      kx = 2*pi*ki/lx
-      ky = 2*pi*kj/ly
+      ky = pi2*kj/ly
       kp2 = kx*kx + ky*ky
       filt = exp(-1*(xshape**2*kx**2+yshape**2*ky**2)**2)
       coeff(i,j) = filt/(memif*teti*kp2)
@@ -171,7 +176,7 @@ subroutine initialize
       ! isolate 1,1 and 2,0 if isolate == 1
       if ((isolate == 1) .and. (.not.(((ki == 1).and.(kj == 1)) .or. ((ki == 2).and.(kj == 0))))) coeff(i,j)=0.
       ! remove odd kx modes for ky=0
-      if ((odd /= 1) .and. (kj == 0) .and. (mod(ki,2) == 1)) coeff(i,j) = 0
+      if ((oddmodes /= 1) .and. (kj == 0) .and. (mod(ki,2) == 1)) coeff(i,j) = 0
       if (myid==0) then
         print*,'coeff(',i,',',j,') = ',coeff(i,j)
       end if
@@ -201,7 +206,10 @@ subroutine load
     vyi(m)=dinvnorm(revers(myid*ni+m,5))
     vpari(m)=dinvnorm(revers(myid*ni+m,7))
 !   initialize weights
-    if (initphi /= 1) wi1(m)=amp*dsin(pi2*xi(m)/lx)*dsin(pi2*yi(m)/ly)
+    if (initphi /= 1) then
+      if (reflect /= 1) wi1(m)=amp*dsin(pi2*xi(m)/lx)*dsin(pi2*yi(m)/ly)
+      if (reflect == 1) wi1(m)=amp*dsin(pi*xi(m)/lx)*dsin(pi2*yi(m)/ly)
+    end if
   end do
 
   ! electrons
@@ -213,7 +221,10 @@ subroutine load
   !   load maxwellian velocities
       vpare(m)=dinvnorm(revers(myid*ne+m,3))/sqrt(memip)
   !   initialize weights
-      if (initphi /= 1) we1(m)=amp*dsin(pi2*xe1(m)/lx)*dsin(pi2*ye1(m)/ly)
+      if (initphi /= 1) then
+        if (reflect /=1) we1(m)=amp*dsin(pi2*xe1(m)/lx)*dsin(pi2*ye1(m)/ly)
+        if (reflect ==1) we1(m)=amp*dsin(pi*xe1(m)/lx)*dsin(pi2*ye1(m)/ly)
+      end if
     end do
   end if
 
@@ -281,14 +292,25 @@ subroutine accumulate
     end if
   end do
 
-  do j=0,ny
-    deni(0,j)=deni(0,j)+deni(nx,j)
-    deni(nx,j)=deni(0,j)
-    if (dke == 1) then
-      dene(0,j)=dene(0,j)+dene(nx,j)
-      dene(nx,j)=dene(0,j)
-    end if
-  end do
+  if (reflect == 1) then
+    do j=0,ny
+      deni(0,j)=0.
+      deni(nx,j)=0.
+      if (dke == 1) then
+        dene(0,j)=0.
+        dene(nx,j)=0.
+      end if
+    end do
+  else
+    do j=0,ny
+      deni(0,j)=deni(0,j)+deni(nx,j)
+      deni(nx,j)=deni(0,j)
+      if (dke == 1) then
+        dene(0,j)=dene(0,j)+dene(nx,j)
+        dene(nx,j)=dene(0,j)
+      end if
+    end do
+  end if
 
   if (dke == 1) then
     den = deni - dene
@@ -307,32 +329,43 @@ subroutine field
   implicit none
   integer :: i,j,ki,kj
   real(8) :: kx,ky
-  complex(8) :: phit(0:nx-1,0:ny-1)
-  complex(8) :: ext(0:nx-1,0:ny-1),eyt(0:nx-1,0:ny-1)
+  real(8) :: phitr(1:nx-1,0:ny-1),extr(0:nx,0:ny-1),eytr(1:nx-1,0:ny-1)
+  complex(8) :: phit(0:nx-1,0:ny-1),ext(0:nx-1,0:ny-1),eyt(0:nx-1,0:ny-1)
 
   !set potential equal to density and transform to k-space
-  phit = den(0:nx-1,0:ny-1)
-
-  do j=0,ny-1
-    call ccfft('x',-1,nx,phit(:,j))
-  end do
-
+  ! transform in x
+  if (reflect == 1) then
+    phitr = den(1:nx-1,0:ny-1)
+    do j=0,ny-1
+      call dsinf(0,phitr(:,j),nx-1)
+    end do
+    phit = 0.
+    phit(1:nx-1,0:ny-1) = phitr
+  else
+    phit = den(0:nx-1,0:ny-1)
+    do j=0,ny-1
+      call ccfft('x',-1,nx,phit(:,j))
+    end do
+  end if
+  ! transform in y
   do i=0,nx-1
     call ccfft('y',-1,ny,phit(i,:))
   end do
 
   !normalize
-  phit=phit/nx/ny
+  phit=phit/dble(nx)/dble(ny)
+  if (reflect == 1) phit = phit*2
 
   !record selected density modes
   do i=1,nmode
     denhist(i) = phit(modeindices(1,i),modeindices(2,i))
   end do
 
-  !(optional) enforce phi=0 at x=0 and x=lx/2
-  if (bounded==1) then
-    do i=1,nx/2
-      do j=0,ny-1
+  !enforce phi=0 at x=0 and x=lx/2
+  if (reflect /= 1) then
+    do j=0,ny-1
+      phit(0,j) = 0.
+      do i=1,nx/2
         phit(i,j)=(phit(i,j)-phit(nx-i,j))/2
         phit(nx-i,j)=-1*phit(i,j)
       end do
@@ -350,9 +383,9 @@ subroutine field
   if ((tstep.le.ninit).and.(initphi.eq.1)) then
       phit = 0.
       phit(1,1)=amp
-      phit(nx-1,1)=-amp
+      if (reflect /= 1) phit(nx-1,1)=-amp
       phit(1,ny-1)=-amp
-      phit(nx-1,ny-1)=amp
+      if (reflect /= 1) phit(nx-1,ny-1)=amp
   end if
 
   !record selected modes
@@ -361,17 +394,24 @@ subroutine field
   end do
 
   !calculate e-field
-  do i=0,nx-1
+  do i=1,nx-1
     do j=0,ny-1
-      if (i<=nx/2) kx = 2*pi*i/lx
-      if (i>nx/2) kx = -2*pi*(nx-i)/lx
-      if (j<=ny/2) ky = 2*pi*j/ly
-      if (j>ny/2) ky = -2*pi*(ny-j)/ly
+      if (reflect == 1) then
+        kx = pi*dble(i)/lx
+      else 
+        if (i<=nx/2) kx = pi2*dble(i)/lx
+        if (i>nx/2) kx = -pi2*dble(nx-i)/lx
+      end if
+      if (j<=ny/2) ky = pi2*dble(j)/ly
+      if (j>ny/2) ky = -pi2*dble(ny-j)/ly
       ext(i,j) = -IU*kx*teti*phit(i,j)
+      if (reflect /= 1) ext(i,j) = IU*ext(i,j)
       eyt(i,j) = -IU*ky*teti*phit(i,j)
     end do
   end do
 
+  ! transform back
+  ! transform in y
   do i=0,nx-1
     call ccfft('y',1,ny,phit(i,:))
     call ccfft('y',1,ny,ext(i,:))
@@ -379,25 +419,53 @@ subroutine field
 
   end do
 
-  do j=0,ny-1
-    call ccfft('x',1,nx,phit(:,j))
-    call ccfft('x',1,nx,ext(:,j))
-    call ccfft('x',1,nx,eyt(:,j))
+  ! transform in x
+  if (reflect == 1) then
+    do j=0,ny-1
+     
+      phitr = real(phit(1:nx-1,:))
+      extr(0,:) = 0.
+      extr(1:nx-1,:) = real(ext(1:nx-1,:))
+      extr(nx,:) = 0.
+      eytr = real(eyt(1:nx-1,:))
 
-  end do
+      call dsinf(0, phitr(,j), nx-1)
+      call dcosf(0, extr(:,j), nx+1)
+      call dsinf(0, eytr(:,j), nx-1)
+       
+      !store final phi,e-field
+      phi(0,:) = 0.
+      phi(1:nx-1,:) = phitr
+      phi(nx,:) = 0.
 
-  !store final phi,e-field
-  phi(0:nx-1,0:ny-1)=real(phit)
-  ex(0:nx-1,0:ny-1)=real(ext)
-  ey(0:nx-1,0:ny-1)=real(eyt)
+      ex(0:nx,0:ny-1) = extr
 
-  !periodic boundaries
+      ey(0,:) = 0.
+      ey(1:nx-1,0:ny-1) = eytr
+      ey(nx,:) = 0.
+
+    end do
+  else
+    do j=0,ny-1
+     
+      call ccfft('x',1,nx,phit(:,j))
+      call ccfft('x',1,nx,ext(:,j))
+      call ccfft('x',1,nx,eyt(:,j))
+       
+      !store final phi,e-field
+      phi(0:nx-1,0:ny-1)=real(phit)
+      ex(0:nx-1,0:ny-1)=real(ext)
+      ey(0:nx-1,0:ny-1)=real(eyt)
+      phi(nx,:)=phi(0,:)
+      ex(nx,:)=ex(0,:)
+      ey(nx,:)=ey(0,:)
+    end do
+  end if
+
+  ! enforce periodic boundary in y
   phi(:,ny)=phi(:,0)
-  phi(nx,:)=phi(0,:)
   ex(:,ny)=ex(:,0)
-  ex(nx,:)=ex(0,:)
   ey(:,ny)=ey(:,0)
-  ey(nx,:)=ey(0,:)
 
   return
 
@@ -425,33 +493,44 @@ subroutine residual
 end
 
 !-----------------------------------------------------------------------
+
+subroutine get_field(x,y,ax,ay)
+
+  real(8),intent(in) :: x,y
+  real(8),intent(out) :: ax,ay
+
+  real(8) :: xpdx,ypdy,wx,wy
+  integer :: i,j
+  
+  ! interpolation weights
+  xpdx=x/dx
+  ypdy=y/dy
+  i=int(xpdx)
+  j=int(ypdy)
+  wx=dble(i+1)-xpdx
+  wy=dble(j+1)-ypdy
+  ! interpolate e-field
+  ax=ex(i,j)*wx*wy+ex(i+1,j)*(1.0-wx)*wy+&
+    ex(i,j+1)*wx*(1.0-wy)+ex(i+1,j+1)*(1.0-wx)*(1.0-wy)
+  ay=ey(i,j)*wx*wy+ey(i+1,j)*(1.0-wx)*wy+&
+    ey(i,j+1)*wx*(1.0-wy)+ey(i+1,j+1)*(1.0-wx)*(1.0-wy)
+
+
+!-----------------------------------------------------------------------
 !--------particle push subroutines--------------------------------------
 !-----------------------------------------------------------------------
 
 subroutine epush
 
   implicit none
-  integer :: m,i,j
+  integer :: m
   real(8) :: vdv,kap,edv
   real(8) :: ax,ay
-  real(8) :: wx,wy
-  real(8) :: xpdx,ypdy
   real(8) :: vxt,vyt !temp velocity storage
 
   ! ions
   do m=1,ni
-    ! interpolation weights
-    xpdx=xi(m)/dx
-    ypdy=yi(m)/dy
-    i=int(xpdx)
-    j=int(ypdy)
-    wx=dble(i+1)-xpdx
-    wy=dble(j+1)-ypdy
-    ! interpolate e-field
-    ax=ex(i,j)*wx*wy+ex(i+1,j)*(1.0-wx)*wy+&
-      ex(i,j+1)*wx*(1.0-wy)+ex(i+1,j+1)*(1.0-wx)*(1.0-wy)
-    ay=ey(i,j)*wx*wy+ey(i+1,j)*(1.0-wx)*wy+&
-      ey(i,j+1)*wx*(1.0-wy)+ey(i+1,j+1)*(1.0-wx)*(1.0-wy)
+    call getfield(xi(m),yi(m),ax,ay)
     ! 1/2 perp velocity push (note that vy is in rotated frame)
     vxi(m)=vxi(m)+.5*dt*ax*eperpi
     vyi(m)=vyi(m)+.5*dt*ay*cth*eperpi
@@ -474,26 +553,15 @@ subroutine epush
     ! full position advance
     xi(m) = xi(m) + dt*vxi(m)
     yi(m) = yi(m) + dt*cth*vyi(m) + dt*sth*vpari(m)
-    ! periodic boundaries
-    xi(m)=xi(m)-lx*dble(floor(xi(m)/lx))
+    ! boundaries
+    call enforce_bounds(xe0(m),ye0(m),vxi(m),vyi(m))
     yi(m)=yi(m)-ly*dble(floor(yi(m)/ly))
   end do
 
   ! electrons
   if (dke==1) then
     do m=1,ne
-      ! interpolation weights
-      xpdx=xe0(m)/dx
-      ypdy=ye0(m)/dy
-      i=int(xpdx)
-      j=int(ypdy)
-      wx=dble(i+1)-xpdx
-      wy=dble(j+1)-ypdy
-      ! interpolate e-field
-      ax=ex(i,j)*wx*wy+ex(i+1,j)*(1.0-wx)*wy+&
-        ex(i,j+1)*wx*(1.0-wy)+ex(i+1,j+1)*(1.0-wx)*(1.0-wy)
-      ay=ey(i,j)*wx*wy+ey(i+1,j)*(1.0-wx)*wy+&
-        ey(i,j+1)*wx*(1.0-wy)+ey(i+1,j+1)*(1.0-wx)*(1.0-wy)
+      call getfield(xe0(m),ye0(m),ax,ay)
       ! full parallel velocity push
       vpare(m)=vpare(m) - dt*ay*sth*epare/memip
       ! weight equation terms
@@ -504,12 +572,11 @@ subroutine epush
       ! explicit part of position advance
       xe0(m) = xe0(m) + .5*dt*ay*cth*eperpe
       ye0(m) = ye0(m) - .5*dt*ax*cth*eperpe + dt*sth*vpare(m)
+      ! boundaries
+      call enforce_bounds(xe0(m),ye0(m))
       ! initial guess for implicit position
       xe1(m) = xe0(m) + .5*dt*ay*cth*eperpe
       ye1(m) = ye0(m) - .5*dt*ax*cth*eperpe
-      ! periodic boundaries
-      xe0(m)=xe0(m)-lx*dble(floor(xe0(m)/lx))
-      ye0(m)=ye0(m)-ly*dble(floor(ye0(m)/ly))
     end do
   end if
 
@@ -520,25 +587,13 @@ end
 subroutine ipush
 
   implicit none
-  integer :: m,i,j
+  integer :: m
   real(8) :: vdv,kap,edv
   real(8) :: ax,ay
-  real(8) :: wx,wy
-  real(8) :: xpdx,ypdy
 
   ! ions
   do m=1,ni
-    xpdx=xi(m)/dx
-    ypdy=yi(m)/dy
-    i=int(xpdx)
-    j=int(ypdy)
-    wx=dble(i+1)-xpdx
-    wy=dble(j+1)-ypdy
-    ! interpolate e-field
-    ax=ex(i,j)*wx*wy+ex(i+1,j)*(1.0-wx)*wy+&
-      ex(i,j+1)*wx*(1.0-wy)+ex(i+1,j+1)*(1.0-wx)*(1.0-wy)
-    ay=ey(i,j)*wx*wy+ey(i+1,j)*(1.0-wx)*wy+&
-      ey(i,j+1)*wx*(1.0-wy)+ey(i+1,j+1)*(1.0-wx)*(1.0-wy)
+    call getfield(xi(m),yi(m),ax,ay)
     ! weight equation terms
     vdv = vxi(m)**2 + vyi(m)**2 + vpari(m)**2
     edv = vxi(m)*ax + vyi(m)*ay*cth + vpari(m)*ay*sth
@@ -550,18 +605,7 @@ subroutine ipush
   ! electrons
   if (dke==1) then
     do m=1,ne
-      ! interpolation weights
-      xpdx=xe1(m)/dx
-      ypdy=ye1(m)/dy
-      i=int(xpdx)
-      j=int(ypdy)
-      wx=dble(i+1)-xpdx
-      wy=dble(j+1)-ypdy
-      ! interpolate e-field
-      ax=ex(i,j)*wx*wy+ex(i+1,j)*(1.0-wx)*wy+&
-        ex(i,j+1)*wx*(1.0-wy)+ex(i+1,j+1)*(1.0-wx)*(1.0-wy)
-      ay=ey(i,j)*wx*wy+ey(i+1,j)*(1.0-wx)*wy+&
-        ey(i,j+1)*wx*(1.0-wy)+ey(i+1,j+1)*(1.0-wx)*(1.0-wy)
+      call getfield(xe1(m),ye1(m),ax,ay)
       ! weight equation terms
       vdv=vpare(m)**2
       kap=kapne+kapte*(.5*memip*vdv-1.5)
@@ -570,11 +614,37 @@ subroutine ipush
       ! implicit part of position advance
       xe1(m)=xe0(m)+.5*dt*ay*cth
       ye1(m)=ye0(m)-.5*dt*ax*cth
-      ! periodic boundaries
-      xe1(m)=xe1(m)-lx*dble(floor(xe1(m)/lx))
-      ye1(m)=ye1(m)-ly*dble(floor(ye1(m)/ly))
+      ! boundaries
+      call enforce_bounds(xe1(m),ye1(m))
     end do
   end if
+
+end
+
+!-----------------------------------------------------------------------
+
+subroutine enforce_bounds(x,y,vx,vy)
+
+  implicit none
+  real(8) :: x,y
+  real(8), optional :: vx,vy
+
+  !reflecting x-boundaries if reflect==1 otherwise periodic
+  if (reflect == 1) then
+    if (x > lx) then
+      x = x - 2.*(x-lx)
+      if(present(vx)) vx = -vx
+    elseif (x < 0.) then
+      x = -x
+      if(present(vx)) vx = -vx
+    elseif (x == lx) then
+      x = 0.9999*lx
+      if(present(vx)) vx = -vx
+    endif
+  else
+    x=x-lx*dble(floor(x/lx))
+  end if
+  y=y-ly*dble(floor(y/ly))
 
 end
 

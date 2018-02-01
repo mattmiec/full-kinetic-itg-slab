@@ -10,7 +10,7 @@ module li_com
   real(8) :: kapni,kapti,kapne,kapte
   real(8) :: teti,memif,memip
   integer :: eperpi,epari,weighti,eperpe,epare,weighte
-  integer :: bounded,isolate,zflow,odd
+  integer :: reflect,oddmodes,isolate,zflow
   real(8) :: xshape,yshape
   integer :: nrec,nprint,nmode
   integer,dimension(:,:),allocatable :: modeindices
