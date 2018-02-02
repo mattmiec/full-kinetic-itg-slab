@@ -366,7 +366,7 @@ subroutine field
     do j=0,ny-1
       phit(0,j) = 0.
       do i=1,nx/2
-        phit(i,j)=(phit(i,j)-phit(nx-i,j))/2
+        phit(i,j)=(phit(i,j)-phit(nx-i,j))/2.
         phit(nx-i,j)=-1*phit(i,j)
       end do
     end do
@@ -394,7 +394,7 @@ subroutine field
   end do
 
   !calculate e-field
-  do i=1,nx-1
+  do i=0,nx-1
     do j=0,ny-1
       if (reflect == 1) then
         kx = pi*dble(i)/lx
