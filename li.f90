@@ -354,7 +354,7 @@ subroutine field
 
   !normalize
   phit=phit/dble(nx)/dble(ny)
-  if (reflect == 1) phit = phit*2
+  if (reflect == 1) phit = phit*2.
 
   !record selected density modes
   do i=1,nmode
@@ -404,7 +404,7 @@ subroutine field
       end if
       if (j<=ny/2) ky = pi2*dble(j)/ly
       if (j>ny/2) ky = -pi2*dble(ny-j)/ly
-      ext(i,j) = -IU*kx*teti*phit(i,j)
+      ext(i,j) = -kx*teti*phit(i,j)
       if (reflect /= 1) ext(i,j) = IU*ext(i,j)
       eyt(i,j) = -IU*ky*teti*phit(i,j)
     end do
@@ -416,7 +416,6 @@ subroutine field
     call ccfft('y',1,ny,phit(i,:))
     call ccfft('y',1,ny,ext(i,:))
     call ccfft('y',1,ny,eyt(i,:))
-
   end do
 
   ! transform in x
@@ -467,6 +466,12 @@ subroutine field
   ex(:,ny)=ex(:,0)
   ey(:,ny)=ey(:,0)
 
+  !if (myid == 0) then
+    !print*,phi
+    !print*,ex
+    !print*,ey
+  !end if
+
   return
 
 end
@@ -507,7 +512,7 @@ subroutine get_field(x,y,ax,ay)
   ypdy=y/dy
   i=int(xpdx)
   j=int(ypdy)
-  if (j<0 .or. j>ny) print*,'y = ',y
+  !if (j<0 .or. j>ny) print*,'y = ',y
   wx=dble(i+1)-xpdx
   wy=dble(j+1)-ypdy
   ! interpolate e-field
