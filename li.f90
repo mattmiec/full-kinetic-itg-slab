@@ -107,7 +107,7 @@ subroutine initialize
       read(115,*) dumchar
       read(115,*) ni,ne,nt,dt,tol
       read(115,*) dumchar
-      read(115,*) nx,ny,lx,ly,theta
+      read(115,*) nx,ny,lx,ly,theta,order
       read(115,*) dumchar
       read(115,*) dumchar
       read(115,*) amp,initphi,ninit
@@ -251,31 +251,13 @@ subroutine accumulate
 
   ! ions
   do m=1,ni
-    xpdx=xi(m)/dx
-    ypdy=yi(m)/dy
-    i=int(xpdx)
-    j=int(ypdy)
-    wx=dble(i+1)-xpdx
-    wy=dble(j+1)-ypdy
-    mydeni(i,j)=mydeni(i,j)+wi1(m)*wx*wy
-    mydeni(i+1,j)=mydeni(i+1,j)+wi1(m)*(1.0-wx)*wy
-    mydeni(i,j+1)=mydeni(i,j+1)+wi1(m)*wx*(1.0-wy)
-    mydeni(i+1,j+1)=mydeni(i+1,j+1)+wi1(m)*(1.0-wx)*(1.0-wy)
+    call spline(1,xi(m),yi(m),wi1(m),mydeni)
   end do
 
   ! electrons
   if (dke==1) then
     do m=1,ne
-      xpdx=xe1(m)/dx
-      ypdy=ye1(m)/dy
-      i=int(xpdx)
-      j=int(ypdy)
-      wx=dble(i+1)-xpdx
-      wy=dble(j+1)-ypdy
-      mydene(i,j)=mydene(i,j)+we1(m)*wx*wy
-      mydene(i+1,j)=mydene(i+1,j)+we1(m)*(1.0-wx)*wy
-      mydene(i,j+1)=mydene(i,j+1)+we1(m)*wx*(1.0-wy)
-      mydene(i+1,j+1)=mydene(i+1,j+1)+we1(m)*(1.0-wx)*(1.0-wy)
+      call spline(1,xe1(m),ye1(m),we1(m),mydene)
     end do
   end if
 
@@ -500,26 +482,122 @@ end
 
 !-----------------------------------------------------------------------
 
-subroutine get_field(x,y,ax,ay)
+subroutine spline(io, x, y, w, grid)
 
-  real(8),intent(in) :: x,y
-  real(8),intent(out) :: ax,ay
+  ! io = 0 for retrieve
+  ! io = 1 for deposit
+  ! x, y position
+  ! w is weight or output field depending on io
+  ! grid is field quantitiy to interpolate
 
+  ! arguments
+  integer :: io
+  real(8) :: x,y,w
+  real(8),dimension(:,:) :: grid
+
+  ! temporary vars
   real(8) :: xpdx,ypdy,wx,wy
-  integer :: i,j
+  integer :: i0,i1,i2,j0,j1,j2
   
-  ! interpolation weights
-  xpdx=x/dx
-  ypdy=y/dy
-  i=int(xpdx)
-  j=int(ypdy)
-  wx=dble(i+1)-xpdx
-  wy=dble(j+1)-ypdy
+  ! position in grid units
+  xpdx = x / dx
+  ypdy = y / dy
+
+  
   ! interpolate e-field
-  ax=ex(i,j)*wx*wy+ex(i+1,j)*(1.0-wx)*wy+&
-    ex(i,j+1)*wx*(1.0-wy)+ex(i+1,j+1)*(1.0-wx)*(1.0-wy)
-  ay=ey(i,j)*wx*wy+ey(i+1,j)*(1.0-wx)*wy+&
-    ey(i,j+1)*wx*(1.0-wy)+ey(i+1,j+1)*(1.0-wx)*(1.0-wy)
+  if (spline == 2) then
+    !quadratic see Birdsall Langdon p. 169
+     
+    i1 = nint(xpdx) ! central point of spline in x
+    j1 = nint(ypdy) ! central point of spline in y
+
+    ! set grid points to interpolate, based on boundary condition
+    if (i1 == 0) then
+      if (reflect == 1)
+        i0 = 1
+      else
+        i0 = nx-1
+      end if
+      i2 = 1
+    else if (i1 == nx) then
+      if (reflect == 1)
+        i2 = nx-1
+      else
+        i2 = 1
+      end if
+      i0 = nx-1
+    else
+      i0 = i1 - 1
+      i2 = i1 + 1
+    end if
+
+    if (j1 == 0) then
+      j0 = ny-1
+      j2 = 1
+    else if (j1 == ny) then
+      j2 = 1
+      j0 = ny-1
+    else
+      j0 = j1 - 1
+      j2 = j1 + 1
+    end if
+
+    wx0 = .5 * (.5 - (xpdx - dble(i))) ** 2.
+    wx1 = .75 - (xpdx - dble(i)) ** 2.
+    wx2 = .5 * (.5 + (xpdx - dble(i))) ** 2.
+
+    wy0 = .5 * (.5 - (ypdy - dble(j))) ** 2.
+    wy1 = .75 - (ypdy - dble(j)) ** 2.
+    wy2 = .5 * (.5 + (ypdy - dble(j))) ** 2.
+
+    if (io == 0) then
+      w = grid(i0,j0) * wx0 * wy0 &
+        + grid(i0,j1) * wx0 * wy1 &
+        + grid(i0,j2) * wx0 * wy2 &
+        + grid(i1,j0) * wx1 * wy0 &
+        + grid(i1,j1) * wx1 * wy1 &
+        + grid(i1,j2) * wx1 * wy2 &
+        + grid(i2,j0) * wx2 * wy0 &
+        + grid(i2,j1) * wx2 * wy1 &
+        + grid(i2,j2) * wx2 * wy2
+    else
+      grid(i0,j0) += wx0 * wy0 * w
+      grid(i0,j1) += wx0 * wy1 * w
+      grid(i0,j2) += wx0 * wy2 * w
+      grid(i1,j0) += wx1 * wy0 * w
+      grid(i1,j1) += wx1 * wy1 * w
+      grid(i1,j2) += wx1 * wy2 * w
+      grid(i2,j0) += wx2 * wy0 * w
+      grid(i2,j1) += wx2 * wy1 * w
+      grid(i2,j2) += wx2 * wy2 * w
+
+  else !linear
+   
+    !indices
+    i0 = int(xpdx)
+    i1 = i0 + 1
+    j0 = int(ypdy)
+    j1 = j0 + 1
+
+    !interpolation weights
+    wx0 = dble(i+1) - xpdx
+    wx1 = 1 - wx0
+    wy0 = dble(j+1) - ypdy
+    wy1 = 1 - wy0
+
+    if (io == 0) then
+      w  = grid(i0,j0) * wx0 * wy0 &
+         + grid(i1,j0) * wx1 * wy0 &
+         + grid(i0,j1) * wx0 * wy1 &
+         + grid(i1,j1) * wx1 * wy1
+    else
+      grid(i0,j0) += wx0 * wy0 * w
+      grid(i0,j1) += wx0 * wy1 * w
+      grid(i1,j0) += wx1 * wy0 * w
+      grid(i1,j1) += wx1 * wy1 * w
+    end if
+
+  end if
 
 end
 
@@ -537,7 +615,8 @@ subroutine epush
 
   ! ions
   do m=1,ni
-    call get_field(xi(m),yi(m),ax,ay)
+    call spline(0,xi(m),yi(m),ax,ex)
+    call spline(0,xi(m),yi(m),ay,ey)
     ! 1/2 perp velocity push (note that vy is in rotated frame)
     vxi(m)=vxi(m)+.5*dt*ax*eperpi
     vyi(m)=vyi(m)+.5*dt*ay*cth*eperpi
@@ -567,7 +646,8 @@ subroutine epush
   ! electrons
   if (dke==1) then
     do m=1,ne
-      call get_field(xe0(m),ye0(m),ax,ay)
+      call spline(0,xe0(m),ye0(m),ax,ex)
+      call spline(0,xe0(m),ye0(m),ay,ey)
       ! full parallel velocity push
       vpare(m)=vpare(m) - dt*ay*sth*epare/memip
       ! weight equation terms
@@ -599,7 +679,8 @@ subroutine ipush
 
   ! ions
   do m=1,ni
-    call get_field(xi(m),yi(m),ax,ay)
+    call spline(0,xi(m),yi(m),ax,ex)
+    call spline(0,xi(m),yi(m),ay,ey)
     ! weight equation terms
     vdv = vxi(m)**2 + vyi(m)**2 + vpari(m)**2
     edv = vxi(m)*ax + vyi(m)*ay*cth + vpari(m)*ay*sth
@@ -611,7 +692,8 @@ subroutine ipush
   ! electrons
   if (dke==1) then
     do m=1,ne
-      call get_field(xe1(m),ye1(m),ax,ay)
+      call spline(0,xe1(m),ye1(m),ax,ex)
+      call spline(0,xe1(m),ye1(m),ay,ey)
       ! weight equation terms
       vdv=vpare(m)**2
       kap=kapne+kapte*(.5*memip*vdv-1.5)

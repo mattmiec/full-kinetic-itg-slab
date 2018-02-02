@@ -7,8 +7,8 @@
 '  ni          ne          nt          dt          tol                 '
    65536       65536       5000        0.2         1d-4
                                                                       
-'  nx          ny          lx          ly          theta               '
-   32          32          62.83       15.71       0.01
+'  nx          ny          lx          ly          theta       order   '
+   32          32          62.83       15.71       0.01        2
                                                                  
 '--initialization------------------------------------------------------'
 
@@ -55,6 +55,8 @@
 ' tol sets convergence test for picard iteration                       '
 '                                                                      '
 ' theta: \vec{B} = B_0 (\hat{z} cos theta + \hat{y} sin theta)         '
+'                                                                      ' 
+' order: sets b-spline order
 '                                                                      '
 ' amp: initial perturbation size                                       '
 '                                                                      '
@@ -64,7 +66,9 @@
 '                                                                      '
 ' nrec is the number of timesteps between recording mode amplitudes    '
 '                                                                      '
-' ni is the no. of ions, ne is no. of electrons                        '
+' ni is the no. of ions, ne is no. of electrons (if dke == 1)          '
+'                                                                      '
+' dke = 1 for drift kinetic electrons, otherwise adiabatic             '
 '                                                                      '
 ' tets is (q_s T_e)/(e T_s)                                            '
 '                                                                      '

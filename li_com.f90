@@ -4,7 +4,7 @@ module li_com
   include 'mpif.h'
 
 ! li.in primary input variables
-  integer :: nx,ny,nt
+  integer :: nx,ny,nt,order
   real(8) :: tol,lx,ly,dt,theta,amp
   integer :: ni,ne,initphi,ninit,dke
   real(8) :: kapni,kapti,kapne,kapte
