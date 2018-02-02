@@ -8,7 +8,7 @@ contains
 subroutine ccfft(c,isign,n,x)
   character :: c
   integer :: isign,n      
-  complex(8),dimension(0:) :: x
+  complex(8),dimension(:),optional :: x
 
   !initialize
   if(isign==0)then
@@ -52,9 +52,9 @@ subroutine ccfft(c,isign,n,x)
   return
 end subroutine ccfft
 
-subroutine dsinf(init,x,n)
+subroutine dsinf(init,n,x)
    integer :: init,n,i
-   real(8),dimension(:) :: x
+   real(8),dimension(:),optional :: x
 
    if(init/=0)then
      call dsinti(n,scoef)
@@ -70,9 +70,9 @@ subroutine dsinf(init,x,n)
    return
 end subroutine dsinf
 
-subroutine dcosf(init,x,n)
+subroutine dcosf(init,n,x)
    integer :: init,n,i
-   real(8),dimension(:) :: x
+   real(8),dimension(:),optional :: x
 
    if(init/=0)then
      call dcosti(n,ccoef)

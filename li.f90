@@ -150,8 +150,11 @@ subroutine initialize
   idum=ran2(iseed)
 
 ! intialize fourier transform subroutines
-  call ccfft('x',0,nx,tmpx)
-  call ccfft('y',0,ny,tmpy)
+  call ccfft('x',0,nx)
+  call ccfft('y',0,ny)
+
+  call dsinf(1,nx-1)
+  call dcosf(1,nx+1)
 
 ! calculate coefficients for potential
   do i=0,nx-1
@@ -337,7 +340,7 @@ subroutine field
   if (reflect == 1) then
     phitr = den(1:nx-1,0:ny-1)
     do j=0,ny-1
-      call dsinf(0,phitr(:,j),nx-1)
+      call dsinf(0,nx-1,phitr(:,j))
     end do
     phit = 0.
     phit(1:nx-1,0:ny-1) = phitr
@@ -428,9 +431,9 @@ subroutine field
       extr(nx,:) = 0.
       eytr = real(eyt(1:nx-1,:))
 
-      call dsinf(0, phitr(:,j), nx-1)
-      call dcosf(0, extr(:,j), nx+1)
-      call dsinf(0, eytr(:,j), nx-1)
+      call dsinf(0, nx-1, phitr(:,j))
+      call dcosf(0, nx+1, extr(:,j))
+      call dsinf(0, nx-1, eytr(:,j))
        
       !store final phi,e-field
       phi(0,:) = 0.

@@ -30,10 +30,6 @@ module li_com
 ! timing variables
   real(8) :: wall_start,wall_finish,wall_total
 
-! fft variables
-  complex(8),dimension(:),allocatable :: tmpx
-  complex(8),dimension(:),allocatable :: tmpy
-
 ! particle array declarations
   ! ions
   real(8),dimension(:),allocatable :: xi,yi,vxi,vyi,vpari !vy is in rotated frame!
@@ -69,9 +65,6 @@ subroutine init_com
 
   implicit none
 
-! fft allocation
-  allocate(tmpx(0:nx-1),tmpy(0:ny-1))
-
 ! particle allocation
   allocate(xi(1:ni),yi(1:ni))
   allocate(vxi(1:ni),vyi(1:ni),vpari(1:ni))
@@ -102,9 +95,6 @@ end
 subroutine finalize_com
 
   implicit none
-
-! fft deallocation
-  deallocate(tmpx,tmpy)
 
 ! particle deallocation
   deallocate(xi,yi)
