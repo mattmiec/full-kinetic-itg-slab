@@ -425,49 +425,49 @@ subroutine field
   if (reflect == 1) then
     do j=0,ny-1
      
-      phitr = real(phit(1:nx-1,:))
-      extr(0,:) = 0.
+      phitr          = real(phit(1:nx-1,:))
+      extr(0,     :) = 0.
       extr(1:nx-1,:) = real(ext(1:nx-1,:))
-      extr(nx,:) = 0.
-      eytr = real(eyt(1:nx-1,:))
+      extr(nx,    :) = 0.
+      eytr           = real(eyt(1:nx-1,:))
 
       call dsinf(0, nx-1, phitr(:,j))
       call dcosf(0, nx+1, extr(:,j))
       call dsinf(0, nx-1, eytr(:,j))
        
       !store final phi,e-field
-      phi(0,:) = 0.
-      phi(1:nx-1,:) = phitr
-      phi(nx,:) = 0.
+      phi(0,      0:ny-1) = 0.
+      phi(1:nx-1, 0:ny-1) = phitr
+      phi(nx,     0:ny-1) = 0.
 
-      ex(0:nx,0:ny-1) = extr
+      ex(0:nx,    0:ny-1) = extr
 
-      ey(0,:) = 0.
-      ey(1:nx-1,0:ny-1) = eytr
-      ey(nx,:) = 0.
+      ey(0,       0:ny-1) = 0.
+      ey(1:nx-1,  0:ny-1) = eytr
+      ey(nx,      0:ny-1) = 0.
 
     end do
   else
     do j=0,ny-1
      
-      call ccfft('x',1,nx,phit(:,j))
-      call ccfft('x',1,nx,ext(:,j))
-      call ccfft('x',1,nx,eyt(:,j))
+      call ccfft('x', 1,nx, phit(:,j))
+      call ccfft('x', 1,nx, ext(:,j))
+      call ccfft('x', 1,nx, eyt(:,j))
        
       !store final phi,e-field
-      phi(0:nx-1,0:ny-1)=real(phit)
-      ex(0:nx-1,0:ny-1)=real(ext)
-      ey(0:nx-1,0:ny-1)=real(eyt)
-      phi(nx,:)=phi(0,:)
-      ex(nx,:)=ex(0,:)
-      ey(nx,:)=ey(0,:)
+      phi(0:nx-1, 0:ny-1) = real(phit)
+      ex(0:nx-1,  0:ny-1) = real(ext)
+      ey(0:nx-1,  0:ny-1) = real(eyt)
+      phi(nx,     0:ny-1) = phi(0, 0:ny-1)
+      ex(nx,      0:ny-1) = ex(0,  0:ny-1)
+      ey(nx,      0:ny-1) = ey(0,  0:ny-1)
     end do
   end if
 
   ! enforce periodic boundary in y
-  phi(:,ny)=phi(:,0)
-  ex(:,ny)=ex(:,0)
-  ey(:,ny)=ey(:,0)
+  phi(:, ny) = phi(:, 0)
+  ex(:,  ny) = ex(:,  0)
+  ey(:,  ny) = ey(:,  0)
 
   return
 
