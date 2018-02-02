@@ -490,22 +490,23 @@ subroutine spline(io, x, y, w, grid)
   ! w is weight or output field depending on io
   ! grid is field quantitiy to interpolate
 
+  implicit none
+
   ! arguments
   integer :: io
   real(8) :: x,y,w
   real(8),dimension(:,:) :: grid
 
   ! temporary vars
-  real(8) :: xpdx,ypdy,wx,wy
+  real(8) :: xpdx,ypdy,wx0,wx1,wx2,wy0,wy1,wy2
   integer :: i0,i1,i2,j0,j1,j2
   
   ! position in grid units
   xpdx = x / dx
   ypdy = y / dy
-
   
   ! interpolate e-field
-  if (spline == 2) then
+  if (order == 2) then
     !quadratic see Birdsall Langdon p. 169
      
     i1 = nint(xpdx) ! central point of spline in x
@@ -513,14 +514,14 @@ subroutine spline(io, x, y, w, grid)
 
     ! set grid points to interpolate, based on boundary condition
     if (i1 == 0) then
-      if (reflect == 1)
+      if (reflect == 1) then
         i0 = 1
       else
         i0 = nx-1
       end if
       i2 = 1
     else if (i1 == nx) then
-      if (reflect == 1)
+      if (reflect == 1) then
         i2 = nx-1
       else
         i2 = 1
@@ -542,13 +543,13 @@ subroutine spline(io, x, y, w, grid)
       j2 = j1 + 1
     end if
 
-    wx0 = .5 * (.5 - (xpdx - dble(i))) ** 2.
-    wx1 = .75 - (xpdx - dble(i)) ** 2.
-    wx2 = .5 * (.5 + (xpdx - dble(i))) ** 2.
+    wx0 = .5 * (.5 - (xpdx - dble(i1))) ** 2.
+    wx1 = .75 - (xpdx - dble(i1)) ** 2.
+    wx2 = .5 * (.5 + (xpdx - dble(i1))) ** 2.
 
-    wy0 = .5 * (.5 - (ypdy - dble(j))) ** 2.
-    wy1 = .75 - (ypdy - dble(j)) ** 2.
-    wy2 = .5 * (.5 + (ypdy - dble(j))) ** 2.
+    wy0 = .5 * (.5 - (ypdy - dble(j1))) ** 2.
+    wy1 = .75 - (ypdy - dble(j1)) ** 2.
+    wy2 = .5 * (.5 + (ypdy - dble(j1))) ** 2.
 
     if (io == 0) then
       w = grid(i0,j0) * wx0 * wy0 &
@@ -561,15 +562,16 @@ subroutine spline(io, x, y, w, grid)
         + grid(i2,j1) * wx2 * wy1 &
         + grid(i2,j2) * wx2 * wy2
     else
-      grid(i0,j0) += wx0 * wy0 * w
-      grid(i0,j1) += wx0 * wy1 * w
-      grid(i0,j2) += wx0 * wy2 * w
-      grid(i1,j0) += wx1 * wy0 * w
-      grid(i1,j1) += wx1 * wy1 * w
-      grid(i1,j2) += wx1 * wy2 * w
-      grid(i2,j0) += wx2 * wy0 * w
-      grid(i2,j1) += wx2 * wy1 * w
-      grid(i2,j2) += wx2 * wy2 * w
+      grid(i0,j0) = grid(i0,j0) + wx0 * wy0 * w
+      grid(i0,j1) = grid(i0,j1) + wx0 * wy1 * w
+      grid(i0,j2) = grid(i0,j2) + wx0 * wy2 * w
+      grid(i1,j0) = grid(i1,j0) + wx1 * wy0 * w
+      grid(i1,j1) = grid(i1,j1) + wx1 * wy1 * w
+      grid(i1,j2) = grid(i1,j2) + wx1 * wy2 * w
+      grid(i2,j0) = grid(i2,j0) + wx2 * wy0 * w
+      grid(i2,j1) = grid(i2,j1) + wx2 * wy1 * w
+      grid(i2,j2) = grid(i2,j2) + wx2 * wy2 * w
+    end if
 
   else !linear
    
@@ -580,10 +582,10 @@ subroutine spline(io, x, y, w, grid)
     j1 = j0 + 1
 
     !interpolation weights
-    wx0 = dble(i+1) - xpdx
-    wx1 = 1 - wx0
-    wy0 = dble(j+1) - ypdy
-    wy1 = 1 - wy0
+    wx0 = dble(i0 + 1) - xpdx
+    wx1 = 1. - wx0
+    wy0 = dble(j0 + 1) - ypdy
+    wy1 = 1. - wy0
 
     if (io == 0) then
       w  = grid(i0,j0) * wx0 * wy0 &
@@ -591,10 +593,10 @@ subroutine spline(io, x, y, w, grid)
          + grid(i0,j1) * wx0 * wy1 &
          + grid(i1,j1) * wx1 * wy1
     else
-      grid(i0,j0) += wx0 * wy0 * w
-      grid(i0,j1) += wx0 * wy1 * w
-      grid(i1,j0) += wx1 * wy0 * w
-      grid(i1,j1) += wx1 * wy1 * w
+      grid(i0,j0) = grid(i0,j0) + wx0 * wy0 * w
+      grid(i0,j1) = grid(i0,j1) + wx0 * wy1 * w
+      grid(i1,j0) = grid(i1,j0) + wx1 * wy0 * w
+      grid(i1,j1) = grid(i1,j1) + wx1 * wy1 * w
     end if
 
   end if
