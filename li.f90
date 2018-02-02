@@ -377,14 +377,10 @@ subroutine field
   end if
 
   !calculate phi with coefficients calculated during initialization
-  if (myid == 0) print*
   do i=0,nx-1
-    if (myid == 0) print*,'i = ',i
     do j=0,ny-1
       phit(i,j) = coeff(i,j)*phit(i,j)
-      if (myid == 0) print*, phit(i,j)
     end do
-    print*
   end do
 
   !initialize if initphi
