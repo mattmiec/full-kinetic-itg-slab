@@ -466,12 +466,6 @@ subroutine field
   ex(:,ny)=ex(:,0)
   ey(:,ny)=ey(:,0)
 
-  !if (myid == 0) then
-    !print*,phi
-    !print*,ex
-    !print*,ey
-  !end if
-
   return
 
 end
@@ -512,7 +506,6 @@ subroutine get_field(x,y,ax,ay)
   ypdy=y/dy
   i=int(xpdx)
   j=int(ypdy)
-  !if (j<0 .or. j>ny) print*,'y = ',y
   wx=dble(i+1)-xpdx
   wy=dble(j+1)-ypdy
   ! interpolate e-field
