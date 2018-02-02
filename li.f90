@@ -429,7 +429,7 @@ subroutine field
       extr(nx,:) = 0.
       eytr = real(eyt(1:nx-1,:))
 
-      call dsinf(0, phitr(,j), nx-1)
+      call dsinf(0, phitr(:,j), nx-1)
       call dcosf(0, extr(:,j), nx+1)
       call dsinf(0, eytr(:,j), nx-1)
        
@@ -507,6 +507,7 @@ subroutine get_field(x,y,ax,ay)
   ypdy=y/dy
   i=int(xpdx)
   j=int(ypdy)
+  if (j<0 .or. j>ny) print*,'y = ',y
   wx=dble(i+1)-xpdx
   wy=dble(j+1)-ypdy
   ! interpolate e-field
@@ -515,6 +516,7 @@ subroutine get_field(x,y,ax,ay)
   ay=ey(i,j)*wx*wy+ey(i+1,j)*(1.0-wx)*wy+&
     ey(i,j+1)*wx*(1.0-wy)+ey(i+1,j+1)*(1.0-wx)*(1.0-wy)
 
+end
 
 !-----------------------------------------------------------------------
 !--------particle push subroutines--------------------------------------
@@ -530,7 +532,7 @@ subroutine epush
 
   ! ions
   do m=1,ni
-    call getfield(xi(m),yi(m),ax,ay)
+    call get_field(xi(m),yi(m),ax,ay)
     ! 1/2 perp velocity push (note that vy is in rotated frame)
     vxi(m)=vxi(m)+.5*dt*ax*eperpi
     vyi(m)=vyi(m)+.5*dt*ay*cth*eperpi
@@ -554,14 +556,13 @@ subroutine epush
     xi(m) = xi(m) + dt*vxi(m)
     yi(m) = yi(m) + dt*cth*vyi(m) + dt*sth*vpari(m)
     ! boundaries
-    call enforce_bounds(xe0(m),ye0(m),vxi(m),vyi(m))
-    yi(m)=yi(m)-ly*dble(floor(yi(m)/ly))
+    call enforce_bounds(xi(m),yi(m),vxi(m),vyi(m))
   end do
 
   ! electrons
   if (dke==1) then
     do m=1,ne
-      call getfield(xe0(m),ye0(m),ax,ay)
+      call get_field(xe0(m),ye0(m),ax,ay)
       ! full parallel velocity push
       vpare(m)=vpare(m) - dt*ay*sth*epare/memip
       ! weight equation terms
@@ -593,7 +594,7 @@ subroutine ipush
 
   ! ions
   do m=1,ni
-    call getfield(xi(m),yi(m),ax,ay)
+    call get_field(xi(m),yi(m),ax,ay)
     ! weight equation terms
     vdv = vxi(m)**2 + vyi(m)**2 + vpari(m)**2
     edv = vxi(m)*ax + vyi(m)*ay*cth + vpari(m)*ay*sth
@@ -605,7 +606,7 @@ subroutine ipush
   ! electrons
   if (dke==1) then
     do m=1,ne
-      call getfield(xe1(m),ye1(m),ax,ay)
+      call get_field(xe1(m),ye1(m),ax,ay)
       ! weight equation terms
       vdv=vpare(m)**2
       kap=kapne+kapte*(.5*memip*vdv-1.5)
