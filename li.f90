@@ -342,8 +342,9 @@ subroutine field
     do j=0,ny-1
       call dsinf(0,nx-1,phitr(:,j))
     end do
+    ! pad i=0 slice with zeros
     phit = 0.
-    phit(1:nx-1,0:ny-1) = phitr
+    phit(1:nx-1,:) = phitr
   else
     phit = den(0:nx-1,0:ny-1)
     do j=0,ny-1
@@ -357,7 +358,7 @@ subroutine field
 
   !normalize
   phit=phit/dble(nx)/dble(ny)
-  if (reflect == 1) phit = phit*2.
+  if (reflect == 1) phit = 2.*phit
 
   !record selected density modes
   do i=1,nmode
@@ -376,10 +377,14 @@ subroutine field
   end if
 
   !calculate phi with coefficients calculated during initialization
+  if (myid == 0) print*
   do i=0,nx-1
+    if (myid == 0) print*,'i = ',i
     do j=0,ny-1
       phit(i,j) = coeff(i,j)*phit(i,j)
+      if (myid == 0) print*, phit(i,j)
     end do
+    print*
   end do
 
   !initialize if initphi
@@ -421,47 +426,50 @@ subroutine field
     call ccfft('y',1,ny,eyt(i,:))
   end do
 
-  ! transform in x
   if (reflect == 1) then
-    do j=0,ny-1
-     
-      phitr          = real(phit(1:nx-1,:))
-      extr(0,     :) = 0.
-      extr(1:nx-1,:) = real(ext(1:nx-1,:))
-      extr(nx,    :) = 0.
-      eytr           = real(eyt(1:nx-1,:))
 
+    ! ignore padded i=0 zeros, except extr add zeros at i=0, nx
+    phitr          = real(phit(1:nx-1,:))
+    extr(0,     :) = 0.
+    extr(1:nx-1,:) = real(ext(1:nx-1,:))
+    extr(nx,    :) = 0.
+    eytr           = real(eyt(1:nx-1,:))
+
+    ! transform in x
+    do j=0,ny-1
       call dsinf(0, nx-1, phitr(:,j))
       call dcosf(0, nx+1, extr(:,j))
       call dsinf(0, nx-1, eytr(:,j))
-       
-      !store final phi,e-field
-      phi(0,      0:ny-1) = 0.
-      phi(1:nx-1, 0:ny-1) = phitr
-      phi(nx,     0:ny-1) = 0.
-
-      ex(0:nx,    0:ny-1) = extr
-
-      ey(0,       0:ny-1) = 0.
-      ey(1:nx-1,  0:ny-1) = eytr
-      ey(nx,      0:ny-1) = 0.
-
     end do
+       
+    !store final phi,e-field
+    phi(0,      0:ny-1) = 0.
+    phi(1:nx-1, 0:ny-1) = phitr
+    phi(nx,     0:ny-1) = 0.
+
+    ex(:,       0:ny-1) = extr
+
+    ey(0,       0:ny-1) = 0.
+    ey(1:nx-1,  0:ny-1) = eytr
+    ey(nx,      0:ny-1) = 0.
+
   else
+
+    ! transform in x
     do j=0,ny-1
-     
       call ccfft('x', 1,nx, phit(:,j))
       call ccfft('x', 1,nx, ext(:,j))
       call ccfft('x', 1,nx, eyt(:,j))
-       
-      !store final phi,e-field
-      phi(0:nx-1, 0:ny-1) = real(phit)
-      ex(0:nx-1,  0:ny-1) = real(ext)
-      ey(0:nx-1,  0:ny-1) = real(eyt)
-      phi(nx,     0:ny-1) = phi(0, 0:ny-1)
-      ex(nx,      0:ny-1) = ex(0,  0:ny-1)
-      ey(nx,      0:ny-1) = ey(0,  0:ny-1)
     end do
+       
+    !store final phi,e-field
+    phi(0:nx-1, 0:ny-1) = real(phit)
+    ex(0:nx-1,  0:ny-1) = real(ext)
+    ey(0:nx-1,  0:ny-1) = real(eyt)
+    phi(nx,     0:ny-1) = phi(0, 0:ny-1)
+    ex(nx,      0:ny-1) = ex(0,  0:ny-1)
+    ey(nx,      0:ny-1) = ey(0,  0:ny-1)
+
   end if
 
   ! enforce periodic boundary in y
