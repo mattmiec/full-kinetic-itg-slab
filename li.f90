@@ -376,7 +376,7 @@ subroutine field
   end if
 
   !calculate phi with coefficients calculated during initialization
-  do i=1,nx-1
+  do i=0,nx-1
     do j=0,ny-1
       phit(i,j) = coeff(i,j)*phit(i,j)
     end do
