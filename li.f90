@@ -495,7 +495,7 @@ subroutine spline(io, x, y, w, grid)
   ! arguments
   integer :: io
   real(8) :: x,y,w
-  real(8),dimension(:,:) :: grid
+  real(8),dimension(0:nx,0:ny) :: grid
 
   ! temporary vars
   real(8) :: xpdx,ypdy,wx0,wx1,wx2,wy0,wy1,wy2
