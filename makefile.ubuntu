@@ -1,7 +1,7 @@
 F90 = mpifort
 #OPTS = -O3 
 #OPTS = -check all -traceback
-LIB = $(DFFTPACK)
+LIB = -L/usr/local/lib/dfftpack -ldfftpack
 OBJS = li_com.f90 fft_wrapper.f90 fcnt.f90 li.f90
 
 li:  $(OBJS)
