@@ -162,16 +162,17 @@ subroutine initialize
       coeff(i,j)=0.
       if (reflect == 1) then
         ki = i
-        kx = pi*ki/lx
+        kx = pi*dble(ki)/lx
       else
         ki = min(i,nx-i)
-        kx = pi2*ki/lx
+        kx = pi2*dble(ki)/lx
       end if
       kj = min(j,ny-j)
-      ky = pi2*kj/ly
+      ky = pi2*dble(kj)/ly
       kp2 = kx*kx + ky*ky
       filt = exp(-1*(xshape**2*kx**2+yshape**2*ky**2)**2)
-      coeff(i,j) = filt/(memif*teti*kp2)
+      !default solution to Poisson equation
+      if ((ki /= 0) .and. (kj /= 0)) coeff(i,j) = filt/(memif*teti*kp2)
       ! use adiabatic response for k_par /= 0
       if ((dke /= 1) .and. (kj /= 0)) coeff(i,j) = filt
       ! zonal flow excluded if zflow != 1
