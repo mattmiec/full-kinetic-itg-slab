@@ -198,7 +198,6 @@ subroutine load
   integer :: m
 
   wi1 = 0.
-  we1 = 0.
 
   ! ions
   do m=1,ni
@@ -218,6 +217,7 @@ subroutine load
 
   ! electrons
   if (dke == 1) then
+    we1 = 0.
     do m=1,ne
   !   load particle positions
       xe1(m)=lx*revers(myid*ne+m,2)
