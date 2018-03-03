@@ -817,7 +817,7 @@ subroutine gendiagnostics
 
   implicit none
   integer :: id,m,i,j
-  real(8) ::xpdx,ypdy,wx,wy,qx,myqx,w2i,myw2i,w2e,myw2e,mykei,kei,mykee,kee,fe
+  real(8) :: qx,myqx,w2i,myw2i,w2e,myw2e,mykei,kei,mykee,kee,fe,te
   character*5 :: fl
   character*70 :: flnm
 
@@ -837,14 +837,20 @@ subroutine gendiagnostics
 
   do m=1,ni
     !net ion heat flux in x-direction
-    myqx = myqx + wi1(m)*vxi(m)*(vxi(m)**2+vyi(m)**2+vpari(m)**2)
+    myqx = myqx + wi1(m)*vxi1(m)*(vxi1(m)**2+vyi1(m)**2+vpari1(m)**2)
     !weight squared sum
     myw2i = myw2i + wi1(m)**2
-    if (dke == 1) myw2e = myw2e + we1(m)**2
-    !kinetic energies
-    mykei = mykei + 0.5*wi1(m)*(vxi(m)**2+vyi(m)**2+vpari(m)**2)
-    if (dke == 1) mykee = mykee + 0.5*we1(m)*memip*vpare(m)**2
+    !kinetic energy
+    mykei = mykei + 0.5*wi1(m)*(vxi1(m)**2+vyi1(m)**2+vpari1(m)**2)
   end do
+
+  if (dke == 1) then
+    do m=1,ne
+      myw2e = myw2e + we1(m)**2 !weight squared sum
+      mykee = mykee + 0.5*we1(m)*memip*vpare1(m)**2 !kinetic energy
+    end do
+  end if
+
 
   call mpi_allreduce(myqx,qx,1,mpi_real8,mpi_sum,mpi_comm_world,ierr)
   call mpi_allreduce(myw2i,w2i,1,mpi_real8,mpi_sum,mpi_comm_world,ierr)
@@ -854,35 +860,40 @@ subroutine gendiagnostics
 
   qx=qx/dble(tni)
   w2i=w2i/dble(tni)
+  kei=kei/dble(tni)
+
   if (dke == 1) then
     w2e=w2e/dble(tne)
-  else
-    w2e = 0.
-  end if
-  kei=kei/dble(tni)
-  if (dke == 1) then
     kee=kee/dble(tne)
   else
+    w2e = 0.
     kee = 0.
   end if
 
-  !field energy
+  ! field energy
   fe=0.
-  do i=1,nx-1
-    do j=0,ny-1
-      fe = fe + phi(i,j)*den(i,j)
+  do j=0,ny-1
+    fe = fe + 0.25 * dx * dy * (ex(0,j)**2 + ey(0,j)**2)
+    fe = fe + 0.25 * dx * dy * (ex(nx,j)**2 + ey(nx,j)**2)
+    do i=1,nx-1
+      fe = fe + 0.5 * dx * dy * (ex(i,j)**2 + ey(i,j)**2)
     end do
   end do
 
-  fe = 0.5*dx*dy*fe
+  fe = fe/lx/ly
+
+  ! total energy
+  te = kei + fe
+  if (dke == 1) te = te + kee
 
   if (myid==0) then
     flnm='diagn.out'
-    open(id,file=flnm,form='formatted',status='unknown',&
+    open(id,file=flnm,form='formatted',status='unknown', &
       position='append')
     if (tstep==1) write(id,'(a28)') 't  qx  w2i  w2e  kei  kee fe'
     write(id,'(f8.2)',advance="no") dt*tstep
-    write(id,'(a2,e13.6,a2,e13.6,a2,e13.6,a2,e13.6,a2,e13.6,a2,e13.6)') '  ',qx,'  ',w2i,'  ',w2e,'  ',kei,'  ',kee,'  ',fe
+    write(id,'(a2,e13.6,a2,e13.6,a2,e13.6,a2,e13.6,a2,e13.6,a2,e13.6,a2,e13.6)') &
+      '  ',qx,'  ',w2i,'  ',w2e,'  ',kei,'  ',kee,'  ',fe,'  ',te
     endfile id
     close(id)
   endif
