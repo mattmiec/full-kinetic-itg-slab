@@ -172,7 +172,7 @@ subroutine initialize
       kp2 = kx*kx + ky*ky
       filt = exp(-1*(xshape**2*kx**2+yshape**2*ky**2)**2)
       !default solution to Poisson equation
-      if ((ki /= 0) .and. (kj /= 0)) coeff(i,j) = filt/(memif*teti*kp2)
+      if (ki /= 0) coeff(i,j) = filt/(memif*teti*kp2)
       ! use adiabatic response for k_par /= 0
       if ((dke /= 1) .and. (kj /= 0)) coeff(i,j) = filt
       ! zonal flow excluded if zflow != 1
