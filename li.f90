@@ -837,17 +837,17 @@ subroutine gendiagnostics
 
   do m=1,ni
     !net ion heat flux in x-direction
-    myqx = myqx + wi1(m)*vxi1(m)*(vxi1(m)**2+vyi1(m)**2+vpari1(m)**2)
+    myqx = myqx + wi1(m)*vxi(m)*(vxi(m)**2+vyi(m)**2+vpari(m)**2)
     !weight squared sum
     myw2i = myw2i + wi1(m)**2
     !kinetic energy
-    mykei = mykei + 0.5*wi1(m)*(vxi1(m)**2+vyi1(m)**2+vpari1(m)**2)
+    mykei = mykei + 0.5*wi1(m)*(vxi(m)**2+vyi(m)**2+vpari(m)**2)
   end do
 
   if (dke == 1) then
     do m=1,ne
       myw2e = myw2e + we1(m)**2 !weight squared sum
-      mykee = mykee + 0.5*we1(m)*memip*vpare1(m)**2 !kinetic energy
+      mykee = mykee + 0.5*we1(m)*memip*vpare(m)**2 !kinetic energy
     end do
   end if
 
