@@ -139,8 +139,8 @@ subroutine initialize
   IU=cmplx(0.,1.)
   pi=4.0*datan(dble(1.0))
   pi2=pi*2.0
-  dx=lx/float(nx)
-  dy=ly/float(ny)
+  dx=lx/dble(nx)
+  dy=ly/dble(ny)
   sdt=dsin(dt)
   cdt=dcos(dt)
   sth=dsin(theta)
@@ -873,14 +873,14 @@ subroutine gendiagnostics
   ! field energy
   fe=0.
   do j=0,ny-1
-    fe = fe + 0.25 * dx * dy * (ex(0,j)**2 + ey(0,j)**2)
-    fe = fe + 0.25 * dx * dy * (ex(nx,j)**2 + ey(nx,j)**2)
+    fe = fe + 0.25 * (ex(0,j)**2 + ey(0,j)**2)
+    fe = fe + 0.25 * (ex(nx,j)**2 + ey(nx,j)**2)
     do i=1,nx-1
-      fe = fe + 0.5 * dx * dy * (ex(i,j)**2 + ey(i,j)**2)
+      fe = fe + 0.5 * (ex(i,j)**2 + ey(i,j)**2)
     end do
   end do
 
-  fe = fe/lx/ly
+  fe = fe/nx/ny
 
   ! total energy
   te = kei + fe
@@ -890,7 +890,7 @@ subroutine gendiagnostics
     flnm='diagn.out'
     open(id,file=flnm,form='formatted',status='unknown', &
       position='append')
-    if (tstep==1) write(id,'(a28)') 't  qx  w2i  w2e  kei  kee fe'
+    if (tstep==1) write(id,'(a31)') 't  qx  w2i  w2e  kei  kee fe te'
     write(id,'(f8.2)',advance="no") dt*tstep
     write(id,'(a2,e13.6,a2,e13.6,a2,e13.6,a2,e13.6,a2,e13.6,a2,e13.6,a2,e13.6)') &
       '  ',qx,'  ',w2i,'  ',w2e,'  ',kei,'  ',kee,'  ',fe,'  ',te
