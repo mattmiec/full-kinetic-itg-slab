@@ -380,9 +380,11 @@ subroutine field
     phihist(i) = phit(modeindices(1,i),modeindices(2,i))
   end do
 
-  !calculate e-field
+  !calculate e-field, field energy
+  fe = 0.0
   do i=0,nx-1
     do j=0,ny-1
+      !calculate kx, ky
       if (reflect == 1) then
         kx = pi*dble(i)/lx
       else 
@@ -391,9 +393,12 @@ subroutine field
       end if
       if (j<=ny/2) ky = pi2*dble(j)/ly
       if (j>ny/2) ky = -pi2*dble(ny-j)/ly
+      !calculate ex, ey
       ext(i,j) = -kx*teti*phit(i,j)
       if (reflect /= 1) ext(i,j) = IU*ext(i,j)
       eyt(i,j) = -IU*ky*teti*phit(i,j)
+      !calculate fe
+      fe = fe + .5 * (kx**2 + ky**2) * abs(phit(i,j))**2
     end do
   end do
 
@@ -817,7 +822,7 @@ subroutine gendiagnostics
 
   implicit none
   integer :: id,m,i,j
-  real(8) :: qx,myqx,w2i,myw2i,w2e,myw2e,mykei,kei,mykee,kee,fe,te
+  real(8) :: qx,myqx,w2i,myw2i,w2e,myw2e,mykei,kei,mykee,kee,te
   character*5 :: fl
   character*70 :: flnm
 
@@ -869,18 +874,6 @@ subroutine gendiagnostics
     w2e = 0.
     kee = 0.
   end if
-
-  ! field energy
-  fe=0.
-  do j=0,ny-1
-    fe = fe + 0.25 * (ex(0,j)**2 + ey(0,j)**2)
-    fe = fe + 0.25 * (ex(nx,j)**2 + ey(nx,j)**2)
-    do i=1,nx-1
-      fe = fe + 0.5 * (ex(i,j)**2 + ey(i,j)**2)
-    end do
-  end do
-
-  fe = fe/nx/ny
 
   ! total energy
   te = kei + fe

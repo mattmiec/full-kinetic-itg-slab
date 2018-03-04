@@ -30,6 +30,9 @@ module li_com
 ! timing variables
   real(8) :: wall_start,wall_finish,wall_total
 
+! other globals
+  real(8) :: fe
+
 ! particle array declarations
   ! ions
   real(8),dimension(:),allocatable :: xi,yi,vxi,vyi,vpari !vy is in rotated frame!
@@ -51,6 +54,8 @@ module li_com
 
 ! mode history allocation
   complex(8),dimension(:),allocatable :: phihist,denhist,temphist
+
+
 
 
   save
