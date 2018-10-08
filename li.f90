@@ -130,6 +130,11 @@ subroutine initialize
       call init_com
       read(115,*) dumchar
       read(115,*) modeindices
+      read(115,*) dumchar
+      read(115,*) dumchar
+      read(115,*) bamp
+      read(115,*) dumchar
+      read(115,*) bmode
       close(115)
     endif
     call mpi_barrier(mpi_comm_world,ierr)
@@ -380,6 +385,15 @@ subroutine field
     phihist(i) = phit(modeindices(1,i),modeindices(2,i))
   end do
 
+  !add background
+  phit(bmode(1), bmode(2)) = phit(bmode(1), bmode(2)) + bamp
+  phit(bmode(1), ny - bmode(2)) = phit(bmode(1), ny - bmode(2)) - bamp
+  if (reflect /= 1) then
+      phit(nx - bmode(1), bmode(2)) = phit(nx - bmode(1), bmode(2)) - bamp
+      phit(nx - bmode(1), ny - bmode(2)) = phit(nx - bmode(1), ny - bmode(2)) + bamp
+  end if
+
+
   !calculate e-field, field energy
   fe = 0.0
   do i=0,nx-1
@@ -387,7 +401,7 @@ subroutine field
       !calculate kx, ky
       if (reflect == 1) then
         kx = pi*dble(i)/lx
-      else 
+      else
         if (i<=nx/2) kx = pi2*dble(i)/lx
         if (i>nx/2) kx = -pi2*dble(nx-i)/lx
       end if

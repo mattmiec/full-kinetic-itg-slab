@@ -14,6 +14,8 @@ module li_com
   real(8) :: xshape,yshape
   integer :: nrec,nprint,nmode
   integer,dimension(:,:),allocatable :: modeindices
+  real(8) :: bamp
+  integer :: bmode(2)
 
 ! additional parameters
   complex(8) :: IU
