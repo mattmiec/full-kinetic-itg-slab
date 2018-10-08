@@ -393,6 +393,10 @@ subroutine field
       phit(nx - bmode(1), ny - bmode(2)) = phit(nx - bmode(1), ny - bmode(2)) + bamp
   end if
 
+!  print *, 'bamp = ', bamp
+!  print *, 'bmode(1) = ', bmode(1)
+!  print *, 'bmode(2) = ', bmode(2)
+
 
   !calculate e-field, field energy
   fe = 0.0
@@ -722,8 +726,8 @@ subroutine ipush
       ! implicit part of weight advance
       we1(m)=we0(m)-.5*dt*(1-we1(m)*weighte)*(sth*ay*vpare(m)-cth*ay*kap)
       ! implicit part of position advance
-      xe1(m)=xe0(m)+.5*dt*ay*cth
-      ye1(m)=ye0(m)-.5*dt*ax*cth
+      xe1(m)=xe0(m)+.5*dt*ay*cth*eperpe
+      ye1(m)=ye0(m)-.5*dt*ax*cth*eperpe
       ! boundaries
       call enforce_bounds(xe1(m),ye1(m))
     end do
