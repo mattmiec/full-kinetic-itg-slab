@@ -12,8 +12,8 @@
 
 '--initialization------------------------------------------------------'
 
-'  amp         initphi     ninit                                       '
-   1d-4        0           50
+'  amp         initphi     ninit       rand                            '
+   1d-4        0           50          17
 
 '--physical parameters-------------------------------------------------'
 

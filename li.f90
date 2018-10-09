@@ -110,7 +110,7 @@ subroutine initialize
       read(115,*) nx,ny,lx,ly,theta,order
       read(115,*) dumchar
       read(115,*) dumchar
-      read(115,*) amp,initphi,ninit
+      read(115,*) amp,initphi,ninit,rand
       read(115,*) dumchar
       read(115,*) dumchar
       read(115,*) kapni,kapti,kapne,kapte
@@ -215,8 +215,12 @@ subroutine load
     vpari(m)=dinvnorm(revers(myid*ni+m,7))
 !   initialize weights
     if (initphi /= 1) then
-      if (reflect /= 1) wi1(m)=amp*dsin(pi2*xi(m)/lx)*dsin(pi2*yi(m)/ly)
-      if (reflect == 1) wi1(m)=amp*dsin(pi*xi(m)/lx)*dsin(pi2*yi(m)/ly)
+      if (rand /= 0) then
+       wi1(m) = 2. * amp * (ran2(rand) - 0.5)
+      else
+        if (reflect /= 1) wi1(m)=amp*dsin(pi2*xi(m)/lx)*dsin(pi2*yi(m)/ly)
+        if (reflect == 1) wi1(m)=amp*dsin(pi*xi(m)/lx)*dsin(pi2*yi(m)/ly)
+      end if
     end if
   end do
 
@@ -231,8 +235,12 @@ subroutine load
       vpare(m)=dinvnorm(revers(myid*ne+m,3))/sqrt(memip)
   !   initialize weights
       if (initphi /= 1) then
-        if (reflect /=1) we1(m)=amp*dsin(pi2*xe1(m)/lx)*dsin(pi2*ye1(m)/ly)
-        if (reflect ==1) we1(m)=amp*dsin(pi*xe1(m)/lx)*dsin(pi2*ye1(m)/ly)
+        if (rand /= 0) then
+         we1(m) = 2. * amp * (ran2(rand) - 0.5)
+        else
+          if (reflect /=1) we1(m)=amp*dsin(pi2*xe1(m)/lx)*dsin(pi2*ye1(m)/ly)
+          if (reflect ==1) we1(m)=amp*dsin(pi*xe1(m)/lx)*dsin(pi2*ye1(m)/ly)
+        end if
       end if
     end do
   end if
