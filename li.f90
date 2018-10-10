@@ -901,6 +901,9 @@ end
     real(8) :: my_kei, kei, fe ! kinetic and field energies
     real(8) :: my_kee, kee ! kinetic and field energies
     real(8) :: te
+    real(8) :: myupari(0:nx,0:ny), myupare(0:nx,0:ny) ! parallel flows
+    real(8) :: upari(0:nx,0:ny), upare(0:nx,0:ny) ! parallel flows
+    real(8) :: upari_fsa(0:nx), upare_fsa(0:nx)
     character(72) :: filename
 
     qxi = 0.0
@@ -924,6 +927,8 @@ end
       my_w2i = my_w2i + wi1(m) ** 2
       ! kinetic energy
       my_kei = my_kei + 0.25 * (wi0(m) + wi1(m)) * (vxi(m) ** 2 + vyi(m) ** 2 + vpari(m) ** 2)
+      ! parallel flow
+      call spline(1,xi(m),yi(m),0.5*(wi0(m)+wi1(m))*vpari(m),myupari)
     end do
 
     if (dke == 1) then
@@ -934,6 +939,8 @@ end
         my_w2e = my_w2e + we1(m)**2
         !kinetic energy
         my_kee = my_kee + 0.25 * (we0(m) + we1(m)) *memip*vpare(m)**2
+        ! parallel flow
+        call spline(1,0.5*(xe0(m)+xe1(m)),0.5*(ye0(m)+ye1(m)),0.5*(we0(m)+we1(m))*vpare(m),myupare)
       end do
     end if
 
@@ -941,26 +948,47 @@ end
     call mpi_allreduce(my_wi,  wi,  1, mpi_real8, mpi_sum, mpi_comm_world, ierr)
     call mpi_allreduce(my_w2i, w2i, 1, mpi_real8, mpi_sum, mpi_comm_world, ierr)
     call mpi_allreduce(my_kei, kei, 1, mpi_real8, mpi_sum, mpi_comm_world, ierr)
+    call mpi_allreduce(myupari, upari, nx*ny, mpi_real8, mpi_sum, mpi_comm_world, ierr)
     if (dke == 1) then
         call mpi_allreduce(my_we,we,1,mpi_real8,mpi_sum,mpi_comm_world,ierr)
         call mpi_allreduce(my_w2e,w2e,1,mpi_real8,mpi_sum,mpi_comm_world,ierr)
         call mpi_allreduce(my_kee,kee,1,mpi_real8,mpi_sum,mpi_comm_world,ierr)
+        call mpi_allreduce(myupare, upare, nx*ny, mpi_real8, mpi_sum, mpi_comm_world, ierr)
     end if
 
     qxi = qxi / dble(tni)
     wi  = wi  / dble(tni)
     w2i = w2i / dble(tni)
     kei = kei / dble(tni)
+    upari = upari * nx * ny / dble(tni)
 
     if (dke == 1) then
       we=we/dble(tne)
       w2e=w2e/dble(tne)
       kee=kee/dble(tne)
+      upare = upare * nx * ny / dble(tne)
     else
       we = 0.
       w2e = 0.
       kee = 0.
+      upare = 0.
     end if
+
+    ! enforce periodic boundaries on parallel flow
+    if (reflect /= 1) then
+      do j=0,ny
+        upari(0,j)=upari(0,j)+upari(nx,j)
+        upari(nx,j)=upari(0,j)
+        if (dke == 1) then
+          upare(0,j)=upare(0,j)+upare(nx,j)
+          upare(nx,j)=upare(0,j)
+        end if
+      end do
+    end if
+
+    ! take fsa of parallel flow
+    upari_fsa = sum(upari, 2)/ny
+    upare_fsa = sum(upare, 2)/ny
 
     ! total energy
     te = kei + kee + fe
@@ -1040,6 +1068,34 @@ end
       write(id, '(a4, e12.5)', advance = 'no') '    ', fe
       write(id, '(a4, e12.5)', advance = 'no') '    ', te
       write(id, *)
+
+      endfile id
+      close(id)
+
+      ! parallel flow
+
+      filename = 'upari_fsa.out'
+
+      open(id, file = filename, form = 'formatted', status = 'unknown', position = 'append')
+
+      write(id,   '(f12.4)', advance = 'no') dt * tstep
+      do i = 0, nx
+        write(id, '(a4, e12.5)', advance = 'no') '    ', upari_fsa(i)
+      end do
+      write(id,*)
+
+      endfile id
+      close(id)
+
+      filename = 'upare_fsa.out'
+
+      open(id, file = filename, form = 'formatted', status = 'unknown', position = 'append')
+
+      write(id,   '(f12.4)', advance = 'no') dt * tstep
+      do i = 0, nx
+        write(id, '(a4, e12.5)', advance = 'no') '    ', upare_fsa(i)
+      end do
+      write(id,*)
 
       endfile id
       close(id)
