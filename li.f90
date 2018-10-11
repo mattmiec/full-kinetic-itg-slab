@@ -866,7 +866,7 @@ end
 
     implicit none
     integer :: i, j, id = 99
-    real(8) :: grid_array(0: nx - 1, 0: ny - 1)
+    real(8) :: grid_array(0: nx, 0: ny)
     character(*) :: filename
 
     if (myid == 0) then ! master writes to files
