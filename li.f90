@@ -915,14 +915,27 @@ end
     character(72) :: filename
 
     qxi = 0.0
-    wi  = 0.0
-    w2i = 0.0
-    kei = 0.0
-
     my_qxi = 0.0
+    qxe = 0.0
+    my_qxe = 0.0
+    wi  = 0.0
     my_wi  = 0.0
+    w2i = 0.0
     my_w2i = 0.0
+    we  = 0.0
+    my_we  = 0.0
+    w2e = 0.0
+    my_w2e = 0.0
     my_kei = 0.0
+    kei = 0.0
+    my_kee = 0.0
+    kee = 0.0
+    myupari = 0.0
+    myupare = 0.0
+    upari = 0.0
+    upare = 0.0
+    upari_fsa = 0.0
+    upare_fsa = 0.0
 
     !!$acc parallel loop reduction(+:my_qxi,my_wi,my_w2i,my_kei)
     do m = 1, ni
