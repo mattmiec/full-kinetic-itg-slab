@@ -235,7 +235,7 @@ subroutine load
   ! electrons
   if (dke == 1) then
     we1 = 0.
-    wpe1 = 0.
+    wpe1 = 1.
     do m=1,ne
   !   load particle positions
       xe1(m)=lx*revers(myid*ne+m,2)
