@@ -38,10 +38,10 @@ module li_com
 ! particle array declarations
   ! ions
   real(8),dimension(:),allocatable :: xi,yi,vxi,vyi,vpari !vy is in rotated frame!
-  real(8),dimension(:),allocatable :: wi0,wi1
+  real(8),dimension(:),allocatable :: wi0,wi1,wpi0,wpi1
   ! electrons
   real(8),dimension(:),allocatable :: xe0,ye0,xe1,ye1,vpare
-  real(8),dimension(:),allocatable :: we0,we1
+  real(8),dimension(:),allocatable :: we0,we1,wpe0,wpe1
   
 
 ! grid array declarations
@@ -76,9 +76,11 @@ subroutine init_com
   allocate(xi(1:ni),yi(1:ni))
   allocate(vxi(1:ni),vyi(1:ni),vpari(1:ni))
   allocate(wi0(1:ni),wi1(1:ni))
+  allocate(wpi0(1:ni),wpi1(1:ni))
   if (dke == 1) allocate(xe0(1:ne),ye0(1:ne),xe1(1:ne),ye1(1:ne))
   if (dke == 1) allocate(vpare(1:ne))
   if (dke == 1) allocate(we0(1:ne),we1(1:ne))
+  if (dke == 1) allocate(wpe0(1:ne),wpe1(1:ne))
 
 ! grid allocation
   allocate(den(0:nx,0:ny),denlast(0:nx,0:ny))
@@ -107,9 +109,11 @@ subroutine finalize_com
   deallocate(xi,yi)
   deallocate(vxi,vyi,vpari)
   deallocate(wi0,wi1)
+  deallocate(wpi0,wpi1)
   if (dke == 1) deallocate(xe0,ye0,xe1,ye1)
   if (dke == 1) deallocate(vpare)
   if (dke == 1) deallocate(we0,we1)
+  if (dke == 1) deallocate(wpe0,wpe1)
 
 ! grid deallocation
   deallocate(den,denlast)

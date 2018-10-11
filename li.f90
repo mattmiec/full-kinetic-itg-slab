@@ -210,6 +210,7 @@ subroutine load
   integer :: m
 
   wi1 = 0.
+  wpi1 = 1.
 
   ! ions
   do m=1,ni
@@ -234,6 +235,7 @@ subroutine load
   ! electrons
   if (dke == 1) then
     we1 = 0.
+    wpe1 = 0.
     do m=1,ne
   !   load particle positions
       xe1(m)=lx*revers(myid*ne+m,2)
@@ -676,7 +678,8 @@ subroutine epush
     edv = vxi(m)*ax + vyi(m)*ay*cth + vpari(m)*ay*sth
     kap = kapni+kapti*(.5*vdv-1.5)
     ! explicit 1/2 weight advance
-    wi0(m)=wi0(m)+.5*dt*(1-wi0(m)*weighti)*(edv+cth*ay*kap)
+    wi0(m)=wi0(m)+.5*dt*wpi0(m)*(edv+cth*ay*kap)
+    wpi0(m)=wpi0(m)-.5*dt*weighti*edv*wpi0(m)
     ! full position advance
     xi(m) = xi(m) + dt*vxi(m)
     yi(m) = yi(m) + dt*cth*vyi(m) + dt*sth*vpari(m)
@@ -695,7 +698,8 @@ subroutine epush
       vdv=vpare(m)**2
       kap=kapne+kapte*(.5*memip*vdv-1.5)
       ! explicit 1/2 weight advance
-      we0(m)=we0(m)-.5*dt*(1-we0(m)*weighte)*(sth*ay*vpare(m)-cth*ay*kap)
+      we0(m)=we0(m)-.5*dt*wpe0(m)*(sth*ay*vpare(m)-cth*ay*kap)
+      wpe0(m)=wpe0(m)+.5*dt*weighte*sth*ay*vpare(m)*wpe0(m)
       ! explicit part of position advance
       xe0(m) = xe0(m) + .5*dt*ay*cth*eperpe
       ye0(m) = ye0(m) - .5*dt*ax*cth*eperpe + dt*sth*vpare(m)
@@ -727,7 +731,8 @@ subroutine ipush
     edv = vxi(m)*ax + vyi(m)*ay*cth + vpari(m)*ay*sth
     kap = kapni + kapti*(.5*vdv-1.5)
     ! implicit weight advance
-    wi1(m) = wi0(m) + .5*dt*(1-wi1(m)*weighti)*(edv+cth*ay*kap)
+    wpi1(m) = wpi0(m) - .5*dt*weighti*edv*wpi1(m)
+    wi1(m) = wi0(m) + .5*dt*wpi1(m)*(edv+cth*ay*kap)
   end do
 
   ! electrons
@@ -739,7 +744,8 @@ subroutine ipush
       vdv=vpare(m)**2
       kap=kapne+kapte*(.5*memip*vdv-1.5)
       ! implicit part of weight advance
-      we1(m)=we0(m)-.5*dt*(1-we1(m)*weighte)*(sth*ay*vpare(m)-cth*ay*kap)
+      wpe1(m)=wpe0(m)+.5*dt*weighte*sth*ay*vpare(m)*wpe1(m)
+      we1(m)=we0(m)-.5*dt*wpe1(m)*(sth*ay*vpare(m)-cth*ay*kap)
       ! implicit part of position advance
       xe1(m)=xe0(m)+.5*dt*ay*cth*eperpe
       ye1(m)=ye0(m)-.5*dt*ax*cth*eperpe
@@ -784,10 +790,12 @@ subroutine update
   implicit none
 
   wi0 = wi1
+  wpi0 = wpi1
   if (dke==1) then
     xe0 = xe1
     ye0 = ye1
     we0 = we1
+    wpe0 = wpe1
   end if
 
 end
