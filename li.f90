@@ -1011,10 +1011,6 @@ end
     upari_fsa = sum(upari, 2)/ny
     upare_fsa = sum(upare, 2)/ny
 
-    ! total energy
-    te = kei + kee + fe
-
-
     ! field energy
     fe = 0.
     do j = 0, ny - 1
@@ -1024,6 +1020,9 @@ end
     end do
 
     fe = fe/nx/ny ! factor of 8 smaller than Scott's old GK code
+
+    ! total energy
+    te = kei + kee + fe
 
     if (myid == 0) then ! master writes to files
 
