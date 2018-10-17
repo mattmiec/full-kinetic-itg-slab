@@ -122,7 +122,7 @@ subroutine initialize
       read(115,*) dumchar
       read(115,*) kapni,kapti,kapne,kapte
       read(115,*) dumchar
-      read(115,*) teti,memif,dke,memip
+      read(115,*) teti,memi,fki
       read(115,*) dumchar
       read(115,*) dumchar
       read(115,*) eperpi,epari,weighti,eperpe,epare,weighte
@@ -153,8 +153,8 @@ subroutine initialize
   pi2=pi*2.0
   dx=lx/dble(nx)
   dy=ly/dble(ny)
-  sdt=dsin(dt)
-  cdt=dcos(dt)
+  sdt=dsin(memi*dt)
+  cdt=dcos(memi*dt)
   sth=dsin(theta)
   cth=dcos(theta)
 
@@ -184,9 +184,9 @@ subroutine initialize
       kp2 = kx*kx + ky*ky
       filt = exp(-1*(xshape**2*kx**2+yshape**2*ky**2)**2)
       !default solution to Poisson equation
-      if (ki /= 0) coeff(i,j) = filt/(memif*teti*kp2)
+      if (ki /= 0) coeff(i,j) = filt/(teti*kp2)
       ! use adiabatic response for k_par /= 0
-      if ((dke /= 1) .and. (kj /= 0)) coeff(i,j) = filt
+      if ((fki /= 1) .and. (kj /= 0) .and. (ki /= 0)) coeff(i,j) = filt/(1.0 + teti*kp2)
       ! zonal flow excluded if zflow != 1
       if ((zflow /= 1) .and. kj==0) coeff(i,j)=0.
       ! isolate 1,1 and 2,0 if isolate == 1
@@ -213,46 +213,46 @@ subroutine load
   wpi1 = 1.
 
   ! ions
-  do m=1,ni
-!   load particle positions
-    xi(m)=lx*revers(myid*ni+m,2)
-    yi(m)=ly*(dble(myid*ni+m)-0.5)/dble(tni)
-!   load maxwellian velocities
-    vxi(m)=dinvnorm(revers(myid*ni+m,3))
-    vyi(m)=dinvnorm(revers(myid*ni+m,5))
-    vpari(m)=dinvnorm(revers(myid*ni+m,7))
-!   initialize weights
-    if (initphi /= 1) then
-      if (rand /= 0) then
-       wi1(m) = 2. * amp * (ran2(rand) - 0.5)
-      else
-        if (reflect /= 1) wi1(m)=amp*dsin(pi2*xi(m)/lx)*dsin(pi2*yi(m)/ly)
-        if (reflect == 1) wi1(m)=amp*dsin(pi*xi(m)/lx)*dsin(pi2*yi(m)/ly)
-      end if
-    end if
-  end do
-
-  ! electrons
-  if (dke == 1) then
-    we1 = 0.
-    wpe1 = 1.
-    do m=1,ne
+  if (fki == 1) then
+    do m=1,ni
   !   load particle positions
-      xe1(m)=lx*revers(myid*ne+m,2)
-      ye1(m)=ly*(dble(myid*ne+m)-0.5)/dble(tne)
+      xi(m)=lx*revers(myid*ni+m,2)
+      yi(m)=ly*(dble(myid*ni+m)-0.5)/dble(tni)
   !   load maxwellian velocities
-      vpare(m)=dinvnorm(revers(myid*ne+m,3))/sqrt(memip)
+      vxi(m)=dinvnorm(revers(myid*ni+m,3))*sqrt(memi)
+      vyi(m)=dinvnorm(revers(myid*ni+m,5))*sqrt(memi)
+      vpari(m)=dinvnorm(revers(myid*ni+m,7))*sqrt(memi)
   !   initialize weights
       if (initphi /= 1) then
         if (rand /= 0) then
-         we1(m) = 2. * amp * (ran2(rand) - 0.5)
+         wi1(m) = 2. * amp * (ran2(rand) - 0.5)
         else
-          if (reflect /=1) we1(m)=amp*dsin(pi2*xe1(m)/lx)*dsin(pi2*ye1(m)/ly)
-          if (reflect ==1) we1(m)=amp*dsin(pi*xe1(m)/lx)*dsin(pi2*ye1(m)/ly)
+          if (reflect /= 1) wi1(m)=amp*dsin(pi2*xi(m)/lx)*dsin(pi2*yi(m)/ly)
+          if (reflect == 1) wi1(m)=amp*dsin(pi*xi(m)/lx)*dsin(pi2*yi(m)/ly)
         end if
       end if
     end do
   end if
+
+! electrons
+  we1 = 0.
+  wpe1 = 1.
+  do m=1,ne
+!   load particle positions
+    xe1(m)=lx*revers(myid*ne+m,2)
+    ye1(m)=ly*(dble(myid*ne+m)-0.5)/dble(tne)
+!   load maxwellian velocities
+    vpare(m)=dinvnorm(revers(myid*ne+m,3))
+!   initialize weights
+    if (initphi /= 1) then
+      if (rand /= 0) then
+       we1(m) = 2. * amp * (ran2(rand) - 0.5)
+      else
+        if (reflect /=1) we1(m)=amp*dsin(pi2*xe1(m)/lx)*dsin(pi2*ye1(m)/ly)
+        if (reflect ==1) we1(m)=amp*dsin(pi*xe1(m)/lx)*dsin(pi2*ye1(m)/ly)
+      end if
+    end if
+  end do
 
 end
 
@@ -270,60 +270,60 @@ subroutine accumulate
   denlast=den
   den=0
   mydeni=0
-  if (dke == 1) mydene=0
+  mydene=0
 
   ! ions
-  do m=1,ni
-    call spline(1,xi(m),yi(m),wi1(m),mydeni)
-  end do
-
-  ! electrons
-  if (dke==1) then
-    do m=1,ne
-      call spline(1,xe1(m),ye1(m),we1(m),mydene)
+  if (fki == 1) then
+    do m=1,ni
+      call spline(1,xi(m),yi(m),wi1(m),mydeni)
     end do
   end if
 
-  call mpi_allreduce(mydeni,deni,(nx+1)*(ny+1),mpi_real8,mpi_sum,mpi_comm_world,ierr)
-  if (dke == 1) call mpi_allreduce(mydene,dene,(nx+1)*(ny+1),mpi_real8,mpi_sum,mpi_comm_world,ierr)
+  ! electrons
+  do m=1,ne
+    call spline(1,xe1(m),ye1(m),we1(m),mydene)
+  end do
+
+  if (fki == 1) call mpi_allreduce(mydeni,deni,(nx+1)*(ny+1),mpi_real8,mpi_sum,mpi_comm_world,ierr)
+  call mpi_allreduce(mydene,dene,(nx+1)*(ny+1),mpi_real8,mpi_sum,mpi_comm_world,ierr)
 
   !divide by particles per cell
-  deni=deni*dble(nx)*dble(ny)/dble(tni)
-  if (dke == 1) dene=dene*dble(nx)*dble(ny)/dble(tne)
+  if (fki == 1) deni=deni*dble(nx)*dble(ny)/dble(tni)
+  dene=dene*dble(nx)*dble(ny)/dble(tne)
 
   do i=0,nx
-    deni(i,0)=deni(i,0)+deni(i,ny)
-    deni(i,ny)=deni(i,0)
-    if (dke == 1) then
-      dene(i,0)=dene(i,0)+dene(i,ny)
-      dene(i,ny)=dene(i,0)
+    if (fki == 1) then
+      deni(i,0)=deni(i,0)+deni(i,ny)
+      deni(i,ny)=deni(i,0)
     end if
+    dene(i,0)=dene(i,0)+dene(i,ny)
+    dene(i,ny)=dene(i,0)
   end do
 
   if (reflect == 1) then
     do j=0,ny
-      deni(0,j)=0.
-      deni(nx,j)=0.
-      if (dke == 1) then
-        dene(0,j)=0.
-        dene(nx,j)=0.
+      if (fki == 1) then
+        deni(0,j)=0.
+        deni(nx,j)=0.
       end if
+      dene(0,j)=0.
+      dene(nx,j)=0.
     end do
   else
     do j=0,ny
-      deni(0,j)=deni(0,j)+deni(nx,j)
-      deni(nx,j)=deni(0,j)
-      if (dke == 1) then
-        dene(0,j)=dene(0,j)+dene(nx,j)
-        dene(nx,j)=dene(0,j)
+      if (fki == 1) then
+        deni(0,j)=deni(0,j)+deni(nx,j)
+        deni(nx,j)=deni(0,j)
       end if
+      dene(0,j)=dene(0,j)+dene(nx,j)
+      dene(nx,j)=dene(0,j)
     end do
   end if
 
-  if (dke == 1) then
+  if (fki == 1) then
     den = deni - dene
   else
-    den = deni
+    den = -dene
   end if
 
 end
@@ -657,59 +657,61 @@ subroutine epush
   real(8) :: vxt,vyt !temp velocity storage
 
   ! ions
-  do m=1,ni
-    call spline(0,xi(m),yi(m),ax,ex)
-    call spline(0,xi(m),yi(m),ay,ey)
-    ! 1/2 perp velocity push (note that vy is in rotated frame)
-    vxi(m)=vxi(m)+.5*dt*ax*eperpi
-    vyi(m)=vyi(m)+.5*dt*ay*cth*eperpi
-    ! full velocity rotation (note that vy is in rotated frame)
-    vxt = cdt*vxi(m) + sdt*vyi(m)
-    vyt = -1.0*sdt*vxi(m) + cdt*vyi(m)
-    vxi(m) = vxt
-    vyi(m) = vyt
-    ! 1/2 perp velocity push (note that vy is in rotated frame)
-    vxi(m) = vxi(m) + .5*dt*ax*eperpi
-    vyi(m) = vyi(m) + .5*dt*ay*cth*eperpi
-    ! parallel velocity push
-    vpari(m) = vpari(m) + dt*ay*sth*epari
-    ! weight equation terms
-    vdv = vxi(m)**2+vyi(m)**2+vpari(m)**2
-    edv = vxi(m)*ax + vyi(m)*ay*cth + vpari(m)*ay*sth
-    kap = kapni+kapti*(.5*vdv-1.5)
-    ! explicit 1/2 weight advance
-    wi0(m)=wi0(m)+.5*dt*wpi0(m)*(edv+cth*ay*kap)
-    wpi0(m)=wpi0(m)-.5*dt*weighti*edv*wpi0(m)
-    ! full position advance
-    xi(m) = xi(m) + dt*vxi(m)
-    yi(m) = yi(m) + dt*cth*vyi(m) + dt*sth*vpari(m)
-    ! boundaries
-    call enforce_bounds(xi(m),yi(m),vxi(m),vyi(m))
-  end do
-
-  ! electrons
-  if (dke==1) then
-    do m=1,ne
-      call spline(0,xe0(m),ye0(m),ax,ex)
-      call spline(0,xe0(m),ye0(m),ay,ey)
-      ! full parallel velocity push
-      vpare(m)=vpare(m) - dt*ay*sth*epare/memip
+  if (fki == 1) then
+    do m=1,ni
+      call spline(0,xi(m),yi(m),ax,ex)
+      call spline(0,xi(m),yi(m),ay,ey)
+      ! 1/2 perp velocity push (note that vy is in rotated frame)
+      vxi(m)=vxi(m) + .5*dt*ax*eperpi*memi
+      vyi(m)=vyi(m) + .5*dt*ay*cth*eperpi*memi
+      ! full velocity rotation (note that vy is in rotated frame)
+      vxt = cdt*vxi(m) + sdt*vyi(m)
+      vyt = -1.0*sdt*vxi(m) + cdt*vyi(m)
+      vxi(m) = vxt
+      vyi(m) = vyt
+      ! 1/2 perp velocity push (note that vy is in rotated frame)
+      vxi(m) = vxi(m) + .5*dt*ax*eperpi*memi
+      vyi(m) = vyi(m) + .5*dt*ay*cth*eperpi*memi
+      ! parallel velocity push
+      vpari(m) = vpari(m) + dt*ay*sth*epari*memi
       ! weight equation terms
-      vdv=vpare(m)**2
-      kap=kapne+kapte*(.5*memip*vdv-1.5)
+      !!!!!!!!!!!!!!!!!!!! CHECK THIS !!!!!!!!!!!!!!!!!!!!!
+      vdv = vxi(m)**2+vyi(m)**2+vpari(m)**2
+      edv = vxi(m)*ax + vyi(m)*ay*cth + vpari(m)*ay*sth
+      kap = kapni+kapti*(.5*vdv/memi-1.5)
       ! explicit 1/2 weight advance
-      we0(m)=we0(m)-.5*dt*wpe0(m)*(sth*ay*vpare(m)-cth*ay*kap)
-      wpe0(m)=wpe0(m)+.5*dt*weighte*sth*ay*vpare(m)*wpe0(m)
-      ! explicit part of position advance
-      xe0(m) = xe0(m) + .5*dt*ay*cth*eperpe
-      ye0(m) = ye0(m) - .5*dt*ax*cth*eperpe + dt*sth*vpare(m)
+      wi0(m)=wi0(m)+.5*dt*wpi0(m)*(edv+cth*ay*kap)
+      wpi0(m)=wpi0(m)-.5*dt*weighti*edv*wpi0(m)
+      ! full position advance
+      xi(m) = xi(m) + dt*vxi(m)
+      yi(m) = yi(m) + dt*cth*vyi(m) + dt*sth*vpari(m)
       ! boundaries
-      call enforce_bounds(xe0(m),ye0(m))
-      ! initial guess for implicit position
-      xe1(m) = xe0(m) + .5*dt*ay*cth*eperpe
-      ye1(m) = ye0(m) - .5*dt*ax*cth*eperpe
+      call enforce_bounds(xi(m),yi(m),vxi(m),vyi(m))
     end do
   end if
+
+  ! electrons
+  do m=1,ne
+    call spline(0,xe0(m),ye0(m),ax,ex)
+    call spline(0,xe0(m),ye0(m),ay,ey)
+    ! full parallel velocity push
+    vpare(m)=vpare(m) - dt*ay*sth*epare
+    ! weight equation terms
+    !!!!!!!!!!!!!!!!!!!! CHECK THIS !!!!!!!!!!!!!!!!!!!!!
+    vdv=vpare(m)**2
+    kap=kapne+kapte*(.5*vdv-1.5)
+    ! explicit 1/2 weight advance
+    we0(m)=we0(m)-.5*dt*wpe0(m)*(sth*ay*vpare(m)+cth*ay*kap)
+    wpe0(m)=wpe0(m)+.5*dt*weighte*sth*ay*vpare(m)*wpe0(m)
+    ! explicit part of position advance
+    xe0(m) = xe0(m) + .5*dt*ay*cth*eperpe
+    ye0(m) = ye0(m) - .5*dt*ax*cth*eperpe + dt*sth*vpare(m)
+    ! boundaries
+    call enforce_bounds(xe0(m),ye0(m))
+    ! initial guess for implicit position
+    xe1(m) = xe0(m) + .5*dt*ay*cth*eperpe
+    ye1(m) = ye0(m) - .5*dt*ax*cth*eperpe
+  end do
 
 end
 
@@ -723,36 +725,36 @@ subroutine ipush
   real(8) :: ax,ay
 
   ! ions
-  do m=1,ni
-    call spline(0,xi(m),yi(m),ax,ex)
-    call spline(0,xi(m),yi(m),ay,ey)
-    ! weight equation terms
-    vdv = vxi(m)**2 + vyi(m)**2 + vpari(m)**2
-    edv = vxi(m)*ax + vyi(m)*ay*cth + vpari(m)*ay*sth
-    kap = kapni + kapti*(.5*vdv-1.5)
-    ! implicit weight advance
-    wpi1(m) = wpi0(m) - .5*dt*weighti*edv*wpi1(m)
-    wi1(m) = wi0(m) + .5*dt*wpi1(m)*(edv+cth*ay*kap)
-  end do
-
-  ! electrons
-  if (dke==1) then
-    do m=1,ne
-      call spline(0,xe1(m),ye1(m),ax,ex)
-      call spline(0,xe1(m),ye1(m),ay,ey)
+  if (fki == 1) then
+    do m=1,ni
+      call spline(0,xi(m),yi(m),ax,ex)
+      call spline(0,xi(m),yi(m),ay,ey)
       ! weight equation terms
-      vdv=vpare(m)**2
-      kap=kapne+kapte*(.5*memip*vdv-1.5)
-      ! implicit part of weight advance
-      wpe1(m)=wpe0(m)+.5*dt*weighte*sth*ay*vpare(m)*wpe1(m)
-      we1(m)=we0(m)-.5*dt*wpe1(m)*(sth*ay*vpare(m)-cth*ay*kap)
-      ! implicit part of position advance
-      xe1(m)=xe0(m)+.5*dt*ay*cth*eperpe
-      ye1(m)=ye0(m)-.5*dt*ax*cth*eperpe
-      ! boundaries
-      call enforce_bounds(xe1(m),ye1(m))
+      vdv = vxi(m)**2 + vyi(m)**2 + vpari(m)**2
+      edv = vxi(m)*ax + vyi(m)*ay*cth + vpari(m)*ay*sth
+      kap = kapni + kapti*(.5*vdv/memi-1.5)
+      ! implicit weight advance
+      wpi1(m) = wpi0(m) - .5*dt*weighti*edv*wpi1(m)
+      wi1(m) = wi0(m) + .5*dt*wpi1(m)*(edv+cth*ay*kap)
     end do
   end if
+
+  ! electrons
+  do m=1,ne
+     call spline(0,xe1(m),ye1(m),ax,ex)
+     call spline(0,xe1(m),ye1(m),ay,ey)
+     ! weight equation terms
+     vdv=vpare(m)**2
+     kap=kapne+kapte*(.5*vdv-1.5)
+     ! implicit part of weight advance
+     wpe1(m)=wpe0(m)+.5*dt*weighte*sth*ay*vpare(m)*wpe1(m)
+     we1(m)=we0(m)-.5*dt*wpe1(m)*(sth*ay*vpare(m)+cth*ay*kap)
+     ! implicit part of position advance
+     xe1(m)=xe0(m)+.5*dt*ay*cth*eperpe
+     ye1(m)=ye0(m)-.5*dt*ax*cth*eperpe
+     ! boundaries
+     call enforce_bounds(xe1(m),ye1(m))
+   end do
 
 end
 
@@ -789,14 +791,14 @@ subroutine update
 
   implicit none
 
-  wi0 = wi1
-  wpi0 = wpi1
-  if (dke==1) then
-    xe0 = xe1
-    ye0 = ye1
-    we0 = we1
-    wpe0 = wpe1
+  if (fki == 1) then
+    wi0 = wi1
+    wpi0 = wpi1
   end if
+  xe0 = xe1
+  ye0 = ye1
+  we0 = we1
+  wpe0 = wpe1
 
 end
 
@@ -823,7 +825,7 @@ end
       call grid_output(phi, 'phi_grid.out')
       !call grid_output(phi_kmod, 'phi_kmod_grid.out')
       call grid_output(den, 'den_grid.out')
-      if (dke == 1) then
+      if (fki == 1) then
         call grid_output(deni, 'denii_grid.out')
         call grid_output(dene, 'denee_grid.out')
       end if
@@ -938,72 +940,65 @@ end
     upare_fsa = 0.0
 
     !!$acc parallel loop reduction(+:my_qxi,my_wi,my_w2i,my_kei)
-    do m = 1, ni
-      ! x - direction heat flux
-      my_qxi = my_qxi + 0.25 * (wi0(m) + wi1(m)) * vxi(m) &
-          * (vxi(m) ** 2 + vyi(m) ** 2 + vpari(m) ** 2)
-      ! weight sum
-      my_wi = my_wi + wi1(m)
-      ! weight squared sum
-      my_w2i = my_w2i + wi1(m) ** 2
-      ! kinetic energy
-      my_kei = my_kei + 0.25 * (wi0(m) + wi1(m)) * (vxi(m) ** 2 + vyi(m) ** 2 + vpari(m) ** 2)
-      ! parallel flow
-      call spline(1,xi(m),yi(m),0.5*(wi0(m)+wi1(m))*vpari(m),myupari)
-    end do
-
-    if (dke == 1) then
-      do m=1,ne
+    if (fki == 1) then
+      do m = 1, ni
+        ! x - direction heat flux
+        my_qxi = my_qxi + 0.25 * (wi0(m) + wi1(m)) * vxi(m) &
+            * (vxi(m) ** 2 + vyi(m) ** 2 + vpari(m) ** 2)
         ! weight sum
-        my_we = my_we + we1(m)
-        !weight squared sum
-        my_w2e = my_w2e + we1(m)**2
-        !kinetic energy
-        my_kee = my_kee + 0.25 * (we0(m) + we1(m)) *memip*vpare(m)**2
+        my_wi = my_wi + wi1(m)
+        ! weight squared sum
+        my_w2i = my_w2i + wi1(m) ** 2
+        ! kinetic energy
+        my_kei = my_kei + 0.25 * (wi0(m) + wi1(m)) * (vxi(m) ** 2 + vyi(m) ** 2 + vpari(m) ** 2)
         ! parallel flow
-        call spline(1,0.5*(xe0(m)+xe1(m)),0.5*(ye0(m)+ye1(m)),0.5*(we0(m)+we1(m))*vpare(m),myupare)
+        call spline(1,xi(m),yi(m),0.5*(wi0(m)+wi1(m))*vpari(m),myupari)
       end do
     end if
 
-    call mpi_allreduce(my_qxi, qxi, 1, mpi_real8, mpi_sum, mpi_comm_world, ierr)
-    call mpi_allreduce(my_wi,  wi,  1, mpi_real8, mpi_sum, mpi_comm_world, ierr)
-    call mpi_allreduce(my_w2i, w2i, 1, mpi_real8, mpi_sum, mpi_comm_world, ierr)
-    call mpi_allreduce(my_kei, kei, 1, mpi_real8, mpi_sum, mpi_comm_world, ierr)
-    call mpi_allreduce(myupari, upari, nx*ny, mpi_real8, mpi_sum, mpi_comm_world, ierr)
-    if (dke == 1) then
-        call mpi_allreduce(my_we,we,1,mpi_real8,mpi_sum,mpi_comm_world,ierr)
-        call mpi_allreduce(my_w2e,w2e,1,mpi_real8,mpi_sum,mpi_comm_world,ierr)
-        call mpi_allreduce(my_kee,kee,1,mpi_real8,mpi_sum,mpi_comm_world,ierr)
-        call mpi_allreduce(myupare, upare, nx*ny, mpi_real8, mpi_sum, mpi_comm_world, ierr)
+    do m=1,ne
+      ! weight sum
+      my_we = my_we + we1(m)
+      !weight squared sum
+      my_w2e = my_w2e + we1(m)**2
+      !kinetic energy
+      my_kee = my_kee + 0.25 * (we0(m) + we1(m)) *memi*vpare(m)**2
+      ! parallel flow
+      call spline(1,0.5*(xe0(m)+xe1(m)),0.5*(ye0(m)+ye1(m)),0.5*(we0(m)+we1(m))*vpare(m),myupare)
+    end do
+
+    if (fki == 1) then
+      call mpi_allreduce(my_qxi, qxi, 1, mpi_real8, mpi_sum, mpi_comm_world, ierr)
+      call mpi_allreduce(my_wi,  wi,  1, mpi_real8, mpi_sum, mpi_comm_world, ierr)
+      call mpi_allreduce(my_w2i, w2i, 1, mpi_real8, mpi_sum, mpi_comm_world, ierr)
+      call mpi_allreduce(my_kei, kei, 1, mpi_real8, mpi_sum, mpi_comm_world, ierr)
+      call mpi_allreduce(myupari, upari, nx*ny, mpi_real8, mpi_sum, mpi_comm_world, ierr)
+    end if
+    call mpi_allreduce(my_we,we,1,mpi_real8,mpi_sum,mpi_comm_world,ierr)
+    call mpi_allreduce(my_w2e,w2e,1,mpi_real8,mpi_sum,mpi_comm_world,ierr)
+    call mpi_allreduce(my_kee,kee,1,mpi_real8,mpi_sum,mpi_comm_world,ierr)
+    call mpi_allreduce(myupare, upare, nx*ny, mpi_real8, mpi_sum, mpi_comm_world, ierr)
+
+    if (fki == 1) then
+      qxi = qxi / dble(tni)
+      wi  = wi  / dble(tni)
+      w2i = w2i / dble(tni)
+      kei = kei / dble(tni)
+      upari = upari * nx * ny / dble(tni)
     end if
 
-    qxi = qxi / dble(tni)
-    wi  = wi  / dble(tni)
-    w2i = w2i / dble(tni)
-    kei = kei / dble(tni)
-    upari = upari * nx * ny / dble(tni)
-
-    if (dke == 1) then
-      we=we/dble(tne)
-      w2e=w2e/dble(tne)
-      kee=kee/dble(tne)
-      upare = upare * nx * ny / dble(tne)
-    else
-      we = 0.
-      w2e = 0.
-      kee = 0.
-      upare = 0.
-    end if
+    we=we/dble(tne)
+    w2e=w2e/dble(tne)
+    kee=kee/dble(tne)
+    upare = upare * nx * ny / dble(tne)
 
     ! enforce periodic boundaries on parallel flow
     if (reflect /= 1) then
       do j=0,ny
         upari(0,j)=upari(0,j)+upari(nx,j)
         upari(nx,j)=upari(0,j)
-        if (dke == 1) then
-          upare(0,j)=upare(0,j)+upare(nx,j)
-          upare(nx,j)=upare(0,j)
-        end if
+        upare(0,j)=upare(0,j)+upare(nx,j)
+        upare(nx,j)=upare(0,j)
       end do
     end if
 
@@ -1268,7 +1263,7 @@ end
 !  if (dke == 1) then
 !    do m=1,ne
 !      myw2e = myw2e + we1(m)**2 !weight squared sum
-!      mykee = mykee + 0.5*we1(m)*memip*vpare(m)**2 !kinetic energy
+!      mykee = mykee + 0.5*we1(m)*memi*vpare(m)**2 !kinetic energy
 !    end do
 !  end if
 !

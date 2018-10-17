@@ -6,9 +6,9 @@ module li_com
 ! li.in primary input variables
   integer :: nx,ny,nt,order
   real(8) :: tol,lx,ly,dt,theta,amp
-  integer :: ni,ne,initphi,ninit,dke,rand
+  integer :: ni,ne,initphi,ninit,fki,rand
   real(8) :: kapni,kapti,kapne,kapte
-  real(8) :: teti,memif,memip
+  real(8) :: teti,memi
   integer :: eperpi,epari,weighti,eperpe,epare,weighte
   integer :: reflect,oddmodes,isolate,zflow
   real(8) :: xshape,yshape
@@ -73,19 +73,19 @@ subroutine init_com
   implicit none
 
 ! particle allocation
-  allocate(xi(1:ni),yi(1:ni))
-  allocate(vxi(1:ni),vyi(1:ni),vpari(1:ni))
-  allocate(wi0(1:ni),wi1(1:ni))
-  allocate(wpi0(1:ni),wpi1(1:ni))
-  if (dke == 1) allocate(xe0(1:ne),ye0(1:ne),xe1(1:ne),ye1(1:ne))
-  if (dke == 1) allocate(vpare(1:ne))
-  if (dke == 1) allocate(we0(1:ne),we1(1:ne))
-  if (dke == 1) allocate(wpe0(1:ne),wpe1(1:ne))
+  if (fki == 1) allocate(xi(1:ni),yi(1:ni))
+  if (fki == 1) allocate(vxi(1:ni),vyi(1:ni),vpari(1:ni))
+  if (fki == 1) allocate(wi0(1:ni),wi1(1:ni))
+  if (fki == 1) allocate(wpi0(1:ni),wpi1(1:ni))
+  allocate(xe0(1:ne),ye0(1:ne),xe1(1:ne),ye1(1:ne))
+  allocate(vpare(1:ne))
+  allocate(we0(1:ne),we1(1:ne))
+  allocate(wpe0(1:ne),wpe1(1:ne))
 
 ! grid allocation
   allocate(den(0:nx,0:ny),denlast(0:nx,0:ny))
-  allocate(deni(0:nx,0:ny))
-  if (dke == 1) allocate(dene(0:nx,0:ny))
+  if (fki == 1) allocate(deni(0:nx,0:ny))
+  allocate(dene(0:nx,0:ny))
   allocate(phi(0:nx,0:ny),coeff(0:nx-1,0:ny-1))
   allocate(ex(0:nx,0:ny),ey(0:nx,0:ny))
   allocate(tempxy(0:nx,0:ny))
@@ -106,19 +106,19 @@ subroutine finalize_com
   implicit none
 
 ! particle deallocation
-  deallocate(xi,yi)
-  deallocate(vxi,vyi,vpari)
-  deallocate(wi0,wi1)
-  deallocate(wpi0,wpi1)
-  if (dke == 1) deallocate(xe0,ye0,xe1,ye1)
-  if (dke == 1) deallocate(vpare)
-  if (dke == 1) deallocate(we0,we1)
-  if (dke == 1) deallocate(wpe0,wpe1)
+  if (fki == 1) deallocate(xi,yi)
+  if (fki == 1) deallocate(vxi,vyi,vpari)
+  if (fki == 1) deallocate(wi0,wi1)
+  if (fki == 1) deallocate(wpi0,wpi1)
+  deallocate(xe0,ye0,xe1,ye1)
+  deallocate(vpare)
+  deallocate(we0,we1)
+  deallocate(wpe0,wpe1)
 
 ! grid deallocation
   deallocate(den,denlast)
-  deallocate(deni)
-  if (dke == 1) deallocate(dene)
+  if (fki == 1) deallocate(deni)
+  deallocate(dene)
   deallocate(phi,coeff)
   deallocate(ex,ey)
   deallocate(tempxy)
