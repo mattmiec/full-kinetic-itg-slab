@@ -102,6 +102,7 @@ subroutine initialize
   character*(72) dumchar
   integer :: idum,i,j,ki,kj
   real(8) :: kx,ky,kp2,filt
+  real(8) :: gam0, gam1, pol
 
   do i=0,nproc-1
     if (myid==i) then
@@ -182,11 +183,17 @@ subroutine initialize
       kj = min(j,ny-j)
       ky = pi2*dble(kj)/ly
       kp2 = kx*kx + ky*ky
+      call srcbes(kp2,gam0,gam1)
+      if (gke == 1) then
+        pol = teti*(1.-gam0)
+      else
+        pol = teti*kp2
+      end if
       filt = exp(-1*(xshape**2*kx**2+yshape**2*ky**2)**2)
       !default solution to Poisson equation
-      if (ki /= 0) coeff(i,j) = filt/(teti*kp2)
+      if (ki /= 0) coeff(i,j) = filt/pol
       ! use adiabatic response for k_par /= 0
-      if ((fki /= 1) .and. ((kj /= 0) .or. (ki /= 0))) coeff(i,j) = filt/(1.0 + teti*kp2)
+      if ((fki /= 1) .and. ((kj /= 0) .or. (ki /= 0))) coeff(i,j) = filt/(1.0 + pol)
       ! zonal flow excluded if zflow != 1
       if ((zflow /= 1) .and. kj==0) coeff(i,j)=0.
       ! isolate 1,1 and 2,0 if isolate == 1
