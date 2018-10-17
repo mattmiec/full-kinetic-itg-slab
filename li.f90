@@ -649,8 +649,8 @@ subroutine spline(io, x, y, w, grid)
 
   else !linear
 
-    i0 = int(xpdx)
-    j0 = int(ypdy)
+    i0 = floor(xpdx)
+    j0 = floor(ypdy)
 
     !interpolation weights
     wx0 = dble(i0 + 1) - xpdx
