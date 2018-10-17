@@ -242,11 +242,11 @@ subroutine load
     ye1(m)=ly*(dble(myid*ne+m)-0.5)/dble(tne)
 !   load maxwellian velocities
     vpare(m)=dinvnorm(revers(myid*ne+m,13))
-    if (gke == 1) then
-      mue(m) = 2.*(dinvnorm(revers(myid*ne+m,17))**2)
-    else
+!   if (gke == 1) then
+!     mue(m) = 2.*(dinvnorm(revers(myid*ne+m,17))**2)
+!   else
       mue(m) = 1.0
-    end if
+!   end if
 !   initialize weights
     if (initphi /= 1) then
       if (rand /= 0) then
@@ -699,10 +699,10 @@ subroutine gyrospline(io, x, y, rho, w, grid)
   real(8),dimension(0:nx,0:ny) :: grid
 
   ! unit vectors for gyroaverage
-  !real(8), parameter, dimension(4) :: unitvecx = (/1.0,-1.0,0.0,0.0/)
-  !real(8), parameter, dimension(4) :: unitvecy = (/0.0,0.0,1.0,-1.0/)
-  real(8), parameter, dimension(4) :: unitvecx = (/0.0,0.0,0.0,0.0/)
-  real(8), parameter, dimension(4) :: unitvecy = (/0.0,0.0,0.0,0.0/)
+  real(8), parameter, dimension(4) :: unitvecx = (/1.0,-1.0,0.0,0.0/)
+  real(8), parameter, dimension(4) :: unitvecy = (/0.0,0.0,1.0,-1.0/)
+  !real(8), parameter, dimension(4) :: unitvecx = (/0.0,0.0,0.0,0.0/)
+  !real(8), parameter, dimension(4) :: unitvecy = (/0.0,0.0,0.0,0.0/)
 
   ! local weight
   real(8) :: myw
@@ -710,17 +710,21 @@ subroutine gyrospline(io, x, y, rho, w, grid)
   ! loop control
   integer :: i
 
-  do i=1,4
-    if (io == 0) then
-      w = 0
-      !call spline(io, x + rho*unitvecx(i), y + rho*unitvecy(i), myw, grid)
-      call spline(io, x, y, myw, grid)
+!  call spline(io, x, y, w, grid)
+
+  if (io == 0) then
+    w = 0
+    do i=1,4
+      call spline(io, x + rho*unitvecx(i), y + rho*unitvecy(i), myw, grid)
+      !call spline(io, x, y, myw, grid)
       w = w + 0.25*myw
-    else
-      !call spline(io, x + rho*unitvecx(i), y + rho*unitvecy(i), 0.25*w, grid)
-      call spline(io, x, y, 0.25*w, grid)
-    end if
-  end do
+    end do
+  else
+    do i=1,4
+      call spline(io, x + rho*unitvecx(i), y + rho*unitvecy(i), 0.25*w, grid)
+      !call spline(io, x, y, 0.25*w, grid)
+    end do
+  end if
 
 end subroutine gyrospline
 
