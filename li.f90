@@ -249,11 +249,11 @@ subroutine load
     ye1(m)=ly*(dble(myid*ne+m)-0.5)/dble(tne)
 !   load maxwellian velocities
     vpare(m)=dinvnorm(revers(myid*ne+m,13))
-!   if (gke == 1) then
-!     mue(m) = 2.*(dinvnorm(revers(myid*ne+m,17))**2)
-!   else
-      mue(m) = 1.0
-!   end if
+    if (gke == 1) then
+      mue(m) = 2.*(dinvnorm(revers(myid*ne+m,17))**2)
+    else
+      mue(m) = 2.0
+    end if
 !   initialize weights
     if (initphi /= 1) then
       if (rand /= 0) then
@@ -796,7 +796,7 @@ subroutine epush
     !!!!!!!!!!!!!!!!!!!! CHECK THIS !!!!!!!!!!!!!!!!!!!!!
     vdv=vpare(m)**2
     !kap=kapne+kapte*(.5*vdv-1.5)
-    kap=kapne+kapte*(.5*vdv+mue(m)-1.5)
+    kap=kapne+kapte*(.5*(vdv+mue(m))-1.5)
     ! explicit 1/2 weight advance
     we0(m)=we0(m)-.5*dt*wpe0(m)*(sth*ay*vpare(m)-cth*ay*kap)
     wpe0(m)=wpe0(m)+.5*dt*weighte*sth*ay*vpare(m)*wpe0(m)
@@ -848,7 +848,7 @@ subroutine ipush
     ! weight equation terms
     vdv=vpare(m)**2
     !kap=kapne+kapte*(.5*vdv-1.5)
-    kap=kapne+kapte*(.5*vdv+mue(m)-1.5)
+    kap=kapne+kapte*(.5*(vdv+mue(m))-1.5)
     ! implicit part of weight advance
     wpe1(m)=wpe0(m)+.5*dt*weighte*sth*ay*vpare(m)*wpe1(m)
     we1(m)=we0(m)-.5*dt*wpe1(m)*(sth*ay*vpare(m)-cth*ay*kap)
