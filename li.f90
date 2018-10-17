@@ -122,7 +122,7 @@ subroutine initialize
       read(115,*) dumchar
       read(115,*) kapni,kapti,kapne,kapte
       read(115,*) dumchar
-      read(115,*) teti,memi,fki
+      read(115,*) teti,memi,fki,gke
       read(115,*) dumchar
       read(115,*) dumchar
       read(115,*) eperpi,epari,weighti,eperpe,epare,weighte
@@ -186,7 +186,7 @@ subroutine initialize
       !default solution to Poisson equation
       if (ki /= 0) coeff(i,j) = filt/(teti*kp2)
       ! use adiabatic response for k_par /= 0
-      if ((fki /= 1) .and. (kj /= 0) .and. (ki /= 0)) coeff(i,j) = filt/(1.0 + teti*kp2)
+      if ((fki /= 1) .and. ((kj /= 0) .or. (ki /= 0))) coeff(i,j) = filt/(1.0 + teti*kp2)
       ! zonal flow excluded if zflow != 1
       if ((zflow /= 1) .and. kj==0) coeff(i,j)=0.
       ! isolate 1,1 and 2,0 if isolate == 1
@@ -209,11 +209,10 @@ subroutine load
   implicit none
   integer :: m
 
-  wi1 = 0.
-  wpi1 = 1.
-
   ! ions
   if (fki == 1) then
+    wi1 = 0.
+    wpi1 = 1.
     do m=1,ni
   !   load particle positions
       xi(m)=lx*revers(myid*ni+m,2)
@@ -239,10 +238,15 @@ subroutine load
   wpe1 = 1.
   do m=1,ne
 !   load particle positions
-    xe1(m)=lx*revers(myid*ne+m,2)
+    xe1(m)=lx*revers(myid*ne+m,11)
     ye1(m)=ly*(dble(myid*ne+m)-0.5)/dble(tne)
 !   load maxwellian velocities
-    vpare(m)=dinvnorm(revers(myid*ne+m,3))
+    vpare(m)=dinvnorm(revers(myid*ne+m,13))
+    if (gke == 1) then
+      mue(m) = 2.*(dinvnorm(revers(myid*ne+m,17))**2)
+    else
+      mue(m) = 1.0
+    end if
 !   initialize weights
     if (initphi /= 1) then
       if (rand /= 0) then
@@ -280,9 +284,15 @@ subroutine accumulate
   end if
 
   ! electrons
-  do m=1,ne
-    call spline(1,xe1(m),ye1(m),we1(m),mydene)
-  end do
+  if (gke == 1) then
+    do m=1,ne
+      call gyrospline(1,xe1(m),ye1(m),sqrt(mue(m)),we1(m),mydene)
+    end do
+  else
+    do m=1,ne
+      call spline(1,xe1(m),ye1(m),we1(m),mydene)
+    end do
+  end if
 
   if (fki == 1) call mpi_allreduce(mydeni,deni,(nx+1)*(ny+1),mpi_real8,mpi_sum,mpi_comm_world,ierr)
   call mpi_allreduce(mydene,dene,(nx+1)*(ny+1),mpi_real8,mpi_sum,mpi_comm_world,ierr)
@@ -541,24 +551,55 @@ subroutine spline(io, x, y, w, grid)
   ! temporary vars
   real(8) :: xpdx,ypdy,wx0,wx1,wx2,wy0,wy1,wy2
   integer :: i0,i1,i2,j0,j1,j2
-  
+
   ! position in grid units
   xpdx = x / dx
   ypdy = y / dy
-  
+
   ! interpolate e-field
   if (order == 2) then
     !quadratic see Birdsall Langdon p. 169
-     
+
     i1 = nint(xpdx) ! central point of spline in x
     j1 = nint(ypdy) ! central point of spline in y
 
-    ! set grid points to interpolate, based on boundary condition
-    if (i1 == 0) then
+    ! calc weights
+    wx0 = .5 * (.5 - (xpdx - dble(i1))) ** 2.
+    wx1 = .75 - (xpdx - dble(i1)) ** 2.
+    wx2 = .5 * (.5 + (xpdx - dble(i1))) ** 2.
+
+    wy0 = .5 * (.5 - (ypdy - dble(j1))) ** 2.
+    wy1 = .75 - (ypdy - dble(j1)) ** 2.
+    wy2 = .5 * (.5 + (ypdy - dble(j1))) ** 2.
+
+    ! calc indices
+    if (reflect == 1) then
+        if (i1 <= 0) then
+            i0 = -1.0 * (i1 - 1)
+            i2 = -1.0 * (i1 + 1)
+            i1 = -i1
+        else if (i1 >= nx) then
+            i0 = nx - ((i1 - 1) - nx)
+            i2 = nx - ((i1 + 1) - nx)
+            i1 = nx - (i1 - nx)
+        else
+            i0 = i1 - 1
+            i2 = i1 + 1
+        end if
+    else
+        i0 = modulo(i1-1,nx)
+        i1 = modulo(i1,nx)
+        i2 = modulo(i1+1,nx)
+    end if
+    j0 = modulo(j1-1,ny)
+    j1 = modulo(j1,ny)
+    j2 = modulo(j1+1,ny)
+
+    if (i1 <= 0) then
       if (reflect == 1) then
-        i0 = 1
+        i0 = modulo(i1+1,nx)
       else
-        i0 = nx-1
+        i0 = modulo(i1-1,nx)
       end if
       i2 = 1
     else if (i1 == nx) then
@@ -584,14 +625,6 @@ subroutine spline(io, x, y, w, grid)
       j2 = j1 + 1
     end if
 
-    wx0 = .5 * (.5 - (xpdx - dble(i1))) ** 2.
-    wx1 = .75 - (xpdx - dble(i1)) ** 2.
-    wx2 = .5 * (.5 + (xpdx - dble(i1))) ** 2.
-
-    wy0 = .5 * (.5 - (ypdy - dble(j1))) ** 2.
-    wy1 = .75 - (ypdy - dble(j1)) ** 2.
-    wy2 = .5 * (.5 + (ypdy - dble(j1))) ** 2.
-
     if (io == 0) then
       w = grid(i0,j0) * wx0 * wy0 &
         + grid(i0,j1) * wx0 * wy1 &
@@ -615,18 +648,21 @@ subroutine spline(io, x, y, w, grid)
     end if
 
   else !linear
-   
-    !indices
+
     i0 = int(xpdx)
-    i1 = i0 + 1
     j0 = int(ypdy)
-    j1 = j0 + 1
 
     !interpolation weights
     wx0 = dble(i0 + 1) - xpdx
     wx1 = 1. - wx0
     wy0 = dble(j0 + 1) - ypdy
     wy1 = 1. - wy0
+
+    !in-bound indices
+    i0 = modulo(i0,nx)
+    i1 = modulo(i0+1,nx)
+    j0 = modulo(j0,ny)
+    j1 = modulo(j0+1,ny)
 
     if (io == 0) then
       w  = grid(i0,j0) * wx0 * wy0 &
@@ -643,6 +679,50 @@ subroutine spline(io, x, y, w, grid)
   end if
 
 end
+
+!-----------------------------------------------------------------------
+
+subroutine gyrospline(io, x, y, rho, w, grid)
+
+  ! io = 0 for retrieve
+  ! io = 1 for deposit
+  ! x, y position
+  ! rho is gyroradius
+  ! w is weight or output field depending on io
+  ! grid is field quantitiy to interpolate
+
+  implicit none
+
+  ! arguments
+  integer :: io
+  real(8) :: x,y,w,rho
+  real(8),dimension(0:nx,0:ny) :: grid
+
+  ! unit vectors for gyroaverage
+  !real(8), parameter, dimension(4) :: unitvecx = (/1.0,-1.0,0.0,0.0/)
+  !real(8), parameter, dimension(4) :: unitvecy = (/0.0,0.0,1.0,-1.0/)
+  real(8), parameter, dimension(4) :: unitvecx = (/0.0,0.0,0.0,0.0/)
+  real(8), parameter, dimension(4) :: unitvecy = (/0.0,0.0,0.0,0.0/)
+
+  ! local weight
+  real(8) :: myw
+
+  ! loop control
+  integer :: i
+
+  do i=1,4
+    if (io == 0) then
+      w = 0
+      !call spline(io, x + rho*unitvecx(i), y + rho*unitvecy(i), myw, grid)
+      call spline(io, x, y, myw, grid)
+      w = w + 0.25*myw
+    else
+      !call spline(io, x + rho*unitvecx(i), y + rho*unitvecy(i), 0.25*w, grid)
+      call spline(io, x, y, 0.25*w, grid)
+    end if
+  end do
+
+end subroutine gyrospline
 
 !-----------------------------------------------------------------------
 !--------particle push subroutines--------------------------------------
@@ -692,16 +772,22 @@ subroutine epush
 
   ! electrons
   do m=1,ne
-    call spline(0,xe0(m),ye0(m),ax,ex)
-    call spline(0,xe0(m),ye0(m),ay,ey)
+    if (gke == 1) then
+      call gyrospline(0,xe0(m),ye0(m),sqrt(mue(m)),ax,ex)
+      call gyrospline(0,xe0(m),ye0(m),sqrt(mue(m)),ay,ey)
+    else
+      call spline(0,xe0(m),ye0(m),ax,ex)
+      call spline(0,xe0(m),ye0(m),ay,ey)
+    end if
     ! full parallel velocity push
     vpare(m)=vpare(m) - dt*ay*sth*epare
     ! weight equation terms
     !!!!!!!!!!!!!!!!!!!! CHECK THIS !!!!!!!!!!!!!!!!!!!!!
     vdv=vpare(m)**2
-    kap=kapne+kapte*(.5*vdv-1.5)
+    !kap=kapne+kapte*(.5*vdv-1.5)
+    kap=kapne+kapte*(.5*vdv+mue(m)-1.5)
     ! explicit 1/2 weight advance
-    we0(m)=we0(m)-.5*dt*wpe0(m)*(sth*ay*vpare(m)+cth*ay*kap)
+    we0(m)=we0(m)-.5*dt*wpe0(m)*(sth*ay*vpare(m)-cth*ay*kap)
     wpe0(m)=wpe0(m)+.5*dt*weighte*sth*ay*vpare(m)*wpe0(m)
     ! explicit part of position advance
     xe0(m) = xe0(m) + .5*dt*ay*cth*eperpe
@@ -741,20 +827,26 @@ subroutine ipush
 
   ! electrons
   do m=1,ne
-     call spline(0,xe1(m),ye1(m),ax,ex)
-     call spline(0,xe1(m),ye1(m),ay,ey)
-     ! weight equation terms
-     vdv=vpare(m)**2
-     kap=kapne+kapte*(.5*vdv-1.5)
-     ! implicit part of weight advance
-     wpe1(m)=wpe0(m)+.5*dt*weighte*sth*ay*vpare(m)*wpe1(m)
-     we1(m)=we0(m)-.5*dt*wpe1(m)*(sth*ay*vpare(m)+cth*ay*kap)
-     ! implicit part of position advance
-     xe1(m)=xe0(m)+.5*dt*ay*cth*eperpe
-     ye1(m)=ye0(m)-.5*dt*ax*cth*eperpe
-     ! boundaries
-     call enforce_bounds(xe1(m),ye1(m))
-   end do
+    if (gke == 1) then
+      call gyrospline(0,xe1(m),ye1(m),sqrt(mue(m)),ax,ex)
+      call gyrospline(0,xe1(m),ye1(m),sqrt(mue(m)),ay,ey)
+    else
+      call spline(0,xe1(m),ye1(m),ax,ex)
+      call spline(0,xe1(m),ye1(m),ay,ey)
+    end if
+    ! weight equation terms
+    vdv=vpare(m)**2
+    !kap=kapne+kapte*(.5*vdv-1.5)
+    kap=kapne+kapte*(.5*vdv+mue(m)-1.5)
+    ! implicit part of weight advance
+    wpe1(m)=wpe0(m)+.5*dt*weighte*sth*ay*vpare(m)*wpe1(m)
+    we1(m)=we0(m)-.5*dt*wpe1(m)*(sth*ay*vpare(m)-cth*ay*kap)
+    ! implicit part of position advance
+    xe1(m)=xe0(m)+.5*dt*ay*cth*eperpe
+    ye1(m)=ye0(m)-.5*dt*ax*cth*eperpe
+    ! boundaries
+    call enforce_bounds(xe1(m),ye1(m))
+  end do
 
 end
 

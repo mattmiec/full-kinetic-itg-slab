@@ -6,7 +6,7 @@ module li_com
 ! li.in primary input variables
   integer :: nx,ny,nt,order
   real(8) :: tol,lx,ly,dt,theta,amp
-  integer :: ni,ne,initphi,ninit,fki,rand
+  integer :: ni,ne,initphi,ninit,rand,fki,gke
   real(8) :: kapni,kapti,kapne,kapte
   real(8) :: teti,memi
   integer :: eperpi,epari,weighti,eperpe,epare,weighte
@@ -42,6 +42,7 @@ module li_com
   ! electrons
   real(8),dimension(:),allocatable :: xe0,ye0,xe1,ye1,vpare
   real(8),dimension(:),allocatable :: we0,we1,wpe0,wpe1
+  real(8),dimension(:),allocatable :: mue
   
 
 ! grid array declarations
@@ -81,6 +82,7 @@ subroutine init_com
   allocate(vpare(1:ne))
   allocate(we0(1:ne),we1(1:ne))
   allocate(wpe0(1:ne),wpe1(1:ne))
+  allocate(mue(1:ne))
 
 ! grid allocation
   allocate(den(0:nx,0:ny),denlast(0:nx,0:ny))
@@ -114,6 +116,7 @@ subroutine finalize_com
   deallocate(vpare)
   deallocate(we0,we1)
   deallocate(wpe0,wpe1)
+  deallocate(mue)
 
 ! grid deallocation
   deallocate(den,denlast)
