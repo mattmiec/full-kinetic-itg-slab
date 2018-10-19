@@ -182,7 +182,7 @@ subroutine initialize
       end if
       kj = min(j,ny-j)
       ky = pi2*dble(kj)/ly
-      kp2 = kx*kx + ky*ky
+      kp2 = kx*kx + ky*ky*cth*cth
       call srcbes(kp2,gam0,gam1)
       if (gke == 1) then
         pol = teti*(1.-gam0)
